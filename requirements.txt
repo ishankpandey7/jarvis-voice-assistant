@@ -1,0 +1,4 @@
+# Jarvis runs with no dependencies at all. This file is empty on purpose.
+#
+# Only needed if you add a Claude API key (see README, Level 3):
+#   pip install anthropic

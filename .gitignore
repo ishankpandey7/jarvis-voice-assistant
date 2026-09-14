@@ -1,0 +1,9 @@
+# Your API key. Never share this file.
+.env
+
+# Notes, to-dos, reminders -- your own data.
+data/
+
+# Python leftovers
+__pycache__/
+*.pyc

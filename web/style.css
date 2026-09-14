@@ -1,0 +1,399 @@
+/* Jarvis: deep blue ground, one glowing circle in the middle.
+   Every accent comes from a token, so the Ultron block at the bottom
+   can repaint the whole thing by changing four values. */
+
+:root {
+  --bg: #060b16;
+  --bg-2: #0b1424;
+  --line: #1c2c45;
+  --text: #dce7f7;
+  --dim: #6d829f;
+
+  --accent: #38bdf8;
+  --accent-08: rgba(56, 189, 248, 0.08);
+  --accent-16: rgba(56, 189, 248, 0.16);
+  --accent-35: rgba(56, 189, 248, 0.35);
+  --accent-55: rgba(56, 189, 248, 0.55);
+  --core: radial-gradient(circle at 35% 30%, #7dd3fc, #0284c7 60%, #075985);
+  --glow: #11213c;
+  --bar-bg: rgba(6, 11, 22, 0.8);
+  --on-accent: #04121f;
+
+  --green: #34d399;
+  --amber: #fbbf24;
+  --radius: 14px;
+}
+
+* { box-sizing: border-box; }
+
+/* Needed: our own display:flex / display:grid rules outrank the HTML
+   `hidden` attribute, so `hidden` has to be given the final say here. */
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(1100px 700px at 50% -10%, var(--glow) 0%, transparent 60%),
+    var(--bg);
+  color: var(--text);
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  overflow-x: hidden;
+  transition: background 0.5s ease, color 0.5s ease;
+}
+
+.stage {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  /* The type bar is fixed to the bottom, so the page has to leave room --
+     enough for the bar plus a gap, or the last row of chips hides behind it. */
+  padding-bottom: 96px;
+}
+
+/* ------------------------------------------------------------------- top bar */
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bar-bg);
+  backdrop-filter: blur(8px);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  font-size: 14px;
+}
+
+.dot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: var(--dim);
+  transition: background 0.25s, box-shadow 0.25s;
+}
+.dot.live  { background: var(--green);  box-shadow: 0 0 10px var(--green); }
+.dot.busy  { background: var(--amber);  box-shadow: 0 0 10px var(--amber); }
+.dot.speak { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+
+.toggles {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--dim);
+}
+
+.switch { display: flex; align-items: center; gap: 7px; cursor: pointer; }
+.switch input { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
+
+select, .ghost {
+  background: var(--bg-2);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 6px 11px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+select:hover, .ghost:hover { border-color: var(--accent); }
+.ghost.off { color: var(--dim); }
+
+/* -------------------------------------------------------------------- circle */
+
+.middle {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.orb {
+  position: relative;
+  width: 210px; height: 210px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  flex: none;
+  display: grid;
+  place-items: center;
+}
+
+.ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid var(--accent-35);
+}
+.r2 { inset: 22px; border-color: var(--accent-16); }
+.r3 { inset: 44px; border-color: var(--accent-08); }
+
+.core {
+  width: 86px; height: 86px;
+  border-radius: 50%;
+  background: var(--core);
+  box-shadow: 0 0 34px var(--accent-16), inset 0 0 18px rgba(255, 255, 255, 0.22);
+  transition: transform 0.3s ease, box-shadow 0.3s ease, background 0.5s ease;
+}
+
+/* The animation changes with what Jarvis is doing. */
+.orb.idle .r1 { animation: spin 22s linear infinite; }
+.orb.idle .r3 { animation: spin 30s linear infinite reverse; }
+
+.orb.listening .core { transform: scale(1.12); box-shadow: 0 0 60px var(--accent-55); }
+.orb.listening .ring { animation: pulse 1.5s ease-out infinite; border-color: var(--accent); }
+.orb.listening .r2 { animation-delay: 0.25s; }
+.orb.listening .r3 { animation-delay: 0.5s; }
+
+.orb.thinking .core {
+  background: radial-gradient(circle at 35% 30%, #fde68a, #f59e0b 60%, #b45309);
+  animation: breathe 0.9s ease-in-out infinite;
+}
+.orb.speaking .core { animation: breathe 0.55s ease-in-out infinite; }
+
+@keyframes spin    { to { transform: rotate(360deg); } }
+@keyframes pulse   { 0%   { transform: scale(1);    opacity: .85; }
+                     100% { transform: scale(1.32); opacity: 0; } }
+@keyframes breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.14); } }
+
+/* Little bars twitch under the circle while it is listening. */
+.bars {
+  position: absolute;
+  bottom: -30px;
+  display: flex;
+  gap: 4px;
+  align-items: flex-end;
+  height: 22px;
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+.orb.listening .bars { opacity: 1; }
+.bars i {
+  width: 3px;
+  height: 5px;
+  border-radius: 2px;
+  background: var(--accent);
+  animation: jump 0.85s ease-in-out infinite;
+}
+.bars i:nth-child(2) { animation-delay: .10s }
+.bars i:nth-child(3) { animation-delay: .20s }
+.bars i:nth-child(4) { animation-delay: .30s }
+.bars i:nth-child(5) { animation-delay: .15s }
+.bars i:nth-child(6) { animation-delay: .25s }
+.bars i:nth-child(7) { animation-delay: .05s }
+@keyframes jump { 0%,100% { height: 5px } 50% { height: 20px } }
+
+/* ---------------------------------------------------------------------- text */
+
+.hint { margin: 26px 0 0; color: var(--dim); font-size: 14px; }
+
+.heard {
+  margin: 0;
+  min-height: 26px;
+  font-size: 19px;
+  color: var(--accent);
+  font-style: italic;
+  max-width: 620px;
+}
+
+.answer {
+  width: min(680px, 100%);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+  text-align: left;
+  animation: rise 0.28s ease-out;
+}
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } }
+
+.answer-text { margin: 0; font-size: 16px; line-height: 1.6; }
+
+.results {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.results li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  font-size: 13.5px;
+}
+.results li.clickable { cursor: pointer; }
+.results li.clickable:hover { border-color: var(--accent); background: var(--accent-08); }
+.results .meta { color: var(--dim); font-size: 12px; white-space: nowrap; flex: none; }
+.results .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* --------------------------------------------------------------- suggestions */
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 20px 26px;
+}
+.chips button {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--dim);
+  border-radius: 999px;
+  padding: 7px 15px;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: 0.18s;
+}
+.chips button:hover { color: var(--accent); border-color: var(--accent); }
+
+/* ------------------------------------------------------------ typing instead */
+
+.typebar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  display: flex;
+  gap: 9px;
+  padding: 14px 20px;
+  background: var(--bar-bg);
+  border-top: 1px solid var(--line);
+  backdrop-filter: blur(8px);
+  z-index: 40;                       /* must sit above the boot overlay */
+}
+.typebar input {
+  flex: 1;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 11px 15px;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+.typebar input:focus { outline: none; border-color: var(--accent); }
+.typebar button {
+  background: var(--accent);
+  color: var(--on-accent);
+  border: 0;
+  border-radius: 10px;
+  padding: 11px 22px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.typebar button:hover { filter: brightness(1.1); }
+
+/* --------------------------------------------------------------- overlays */
+
+.toast {
+  position: fixed;
+  top: 76px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+  padding: 12px 22px;
+  border-radius: 999px;
+  z-index: 20;
+  box-shadow: 0 8px 30px var(--accent-35);
+  animation: drop 0.3s ease-out;
+  max-width: 90vw;
+  text-align: center;
+}
+@keyframes drop { from { opacity: 0; transform: translate(-50%, -14px); } }
+
+.boot {
+  position: fixed;
+  inset: 0;
+  background: rgba(6, 11, 22, 0.92);
+  display: grid;
+  place-items: center;
+  z-index: 30;
+  padding: 20px;
+}
+.boot-box {
+  max-width: 430px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 26px 28px;
+  text-align: center;
+}
+.boot-box h2 { margin: 0 0 12px; font-size: 19px; }
+.boot-box p { margin: 0 0 10px; color: var(--dim); line-height: 1.6; font-size: 14px; }
+.boot-box .small { font-size: 13px; }
+.boot-box .ghost { margin-top: 8px; }
+
+@media (max-width: 560px) {
+  .orb { width: 165px; height: 165px; }
+  .core { width: 70px; height: 70px; }
+  .heard { font-size: 17px; }
+  .bar { padding: 13px 16px; }
+}
+
+/* Short windows: shrink the circle and its padding so the suggestion
+   chips still fit above the type bar. */
+@media (max-height: 700px) {
+  .middle { padding: 18px 20px; gap: 12px; }
+  .orb { width: 150px; height: 150px; }
+  .core { width: 64px; height: 64px; }
+  .r2 { inset: 16px; } .r3 { inset: 32px; }
+  .hint { margin-top: 18px; }
+  .results { max-height: 170px; }
+  .chips { padding-bottom: 14px; }
+}
+
+/* -------------------------------------------------------- Ultron paint job */
+/* Same layout, different mood. One class on <body> repaints everything. */
+
+body.ultron {
+  --bg: #0d0608;
+  --bg-2: #170a0f;
+  --line: #3a1c26;
+  --text: #f3dde2;
+  --dim: #9a6b77;
+
+  --accent: #f43f5e;
+  --accent-08: rgba(244, 63, 94, 0.08);
+  --accent-16: rgba(244, 63, 94, 0.16);
+  --accent-35: rgba(244, 63, 94, 0.35);
+  --accent-55: rgba(244, 63, 94, 0.55);
+  --core: radial-gradient(circle at 35% 30%, #fda4af, #e11d48 60%, #881337);
+  --glow: #33121c;
+  --bar-bg: rgba(13, 6, 8, 0.85);
+  --on-accent: #1f0409;
+}
+
+body.ultron .boot { background: rgba(13, 6, 8, 0.93); }
+body.ultron .brand { letter-spacing: 5px; }
+body.ultron .orb.thinking .core {
+  background: radial-gradient(circle at 35% 30%, #fecaca, #dc2626 60%, #7f1d1d);
+}

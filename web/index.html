@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jarvis</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='38' fill='none' stroke='%2338bdf8' stroke-width='8'/><circle cx='50' cy='50' r='14' fill='%2338bdf8'/></svg>">
+</head>
+<body>
+
+<div class="stage">
+
+  <header class="bar">
+    <div class="brand">
+      <span class="dot" id="statusDot"></span>
+      <span id="brandName">JARVIS</span>
+    </div>
+    <div class="toggles">
+      <label class="switch">
+        <input type="checkbox" id="wakeToggle">
+        <span>Always listening</span>
+      </label>
+      <select id="personaSelect" title="Who you are talking to">
+        <option value="jarvis">Jarvis</option>
+        <option value="ultron">Ultron</option>
+      </select>
+      <select id="voiceSelect" title="Which voice reads the replies">
+        <option value="">Voice: auto</option>
+      </select>
+      <select id="langSelect" title="Accent for speech recognition">
+        <option value="en-IN">English (India)</option>
+        <option value="en-US">English (US)</option>
+        <option value="en-GB">English (UK)</option>
+      </select>
+      <button id="muteBtn" class="ghost" title="Turn the spoken replies on or off">Voice on</button>
+    </div>
+  </header>
+
+  <main class="middle">
+
+    <button class="orb" id="orb" aria-label="Press to speak">
+      <span class="ring r1"></span>
+      <span class="ring r2"></span>
+      <span class="ring r3"></span>
+      <span class="core"></span>
+      <span class="bars" id="bars" aria-hidden="true">
+        <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+      </span>
+    </button>
+
+    <p class="hint" id="hint">Click the circle and speak</p>
+    <p class="heard" id="heard"></p>
+
+    <section class="answer" id="answer" hidden>
+      <p class="answer-text" id="answerText"></p>
+      <ul class="results" id="results"></ul>
+    </section>
+
+  </main>
+
+  <footer class="chips" id="chips"></footer>
+
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<div class="boot" id="boot" hidden>
+  <div class="boot-box">
+    <h2>The microphone isn't working</h2>
+    <p id="bootMsg"></p>
+    <p class="small">You can type to Jarvis in the box at the bottom instead.</p>
+    <button id="bootClose" class="ghost">Got it</button>
+  </div>
+</div>
+
+<div class="typebar">
+  <input id="typeInput" type="text" placeholder="…or type here (try: open chrome)" autocomplete="off">
+  <button id="typeSend">Send</button>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
