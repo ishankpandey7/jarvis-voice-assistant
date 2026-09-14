@@ -1,0 +1,63 @@
+{
+  "_comment": [
+    "Copy this to data/macros.json to give one name to several commands.",
+    "Your file is merged over the built-in macros in skills/macros.py.",
+    "",
+    "A step is just something you would SAY. There is no separate macro",
+    "language to learn -- each step goes back through the brain exactly as",
+    "if you had spoken it, so anything Jarvis can do, a macro can do.",
+    "",
+    "  steps   the commands, in order. Required.",
+    "  say     what to say when it finishes. Leave it out and Jarvis reads",
+    "          you the answers instead -- which is what you want for a",
+    "          macro made of questions.",
+    "  pause   seconds between steps (default 0.6). Raise it if an app is",
+    "          slow to take focus and the next step lands in the wrong",
+    "          window.",
+    "",
+    "To run one, say its name on its own: 'start work'. A name on its own",
+    "beats every other rule, which is why 'start work' opens your three",
+    "apps rather than looking for an app called 'work'. Anything MORE than",
+    "the bare name goes to the normal rules, so naming a macro 'notes'",
+    "does not stop 'read me my notes' from working.",
+    "",
+    "You never have to edit this file. Say instead:",
+    "  create a macro called start work: open chrome, open spotify",
+    "  list my macros",
+    "  what does the start work macro do",
+    "  forget the start work macro",
+    "",
+    "Setting a name to null deletes a built-in -- see 'wind down' below.",
+    "Restart Jarvis after editing by hand."
+  ],
+
+  "start work": {
+    "steps": [
+      "open vs code",
+      "open chrome",
+      "open spotify"
+    ],
+    "say": "Work setup is up.",
+    "pause": 1.0
+  },
+
+  "morning": {
+    "steps": [
+      "what's the weather",
+      "what's on my list",
+      "how's the battery"
+    ]
+  },
+
+  "study": {
+    "steps": [
+      "focus mode",
+      "open notion",
+      "brightness 40",
+      "set volume to 20"
+    ],
+    "say": "Right, no more distractions."
+  },
+
+  "wind down": null
+}

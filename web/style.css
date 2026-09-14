@@ -250,7 +250,18 @@ select:hover, .ghost:hover { border-color: var(--accent); }
 .results li.clickable { cursor: pointer; }
 .results li.clickable:hover { border-color: var(--accent); background: var(--accent-08); }
 .results .meta { color: var(--dim); font-size: 12px; white-space: nowrap; flex: none; }
+/* A file's size never wraps -- it is three characters. What a macro's step
+   said is a whole sentence, so that kind wraps and shares the row instead
+   of pushing the step's name off the left edge. */
+.results .meta.note {
+  white-space: normal;
+  text-align: right;
+  flex: 1 1 55%;
+  line-height: 1.45;
+}
+.results li:has(.meta.note) { align-items: flex-start; }
 .results .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.results li:has(.meta.note) .label { flex: 0 1 auto; }
 
 /* --------------------------------------------------------------- suggestions */
 

@@ -170,6 +170,47 @@ pages open directly through Windows' own `ms-settings:` links, so
 | `play some lofi on youtube` | opens YouTube |
 | `how's the battery` / `how much space do I have` | machine health |
 
+### Macros — one name, several commands
+
+Opening VS Code, Chrome and Spotify every morning is three sentences. A macro
+makes it one word.
+
+| Say | What happens |
+|---|---|
+| `start work` | opens VS Code, Chrome and Spotify |
+| `create a macro called study: open notion, then brightness 40` | saved, and read back to you |
+| `list my macros` | every macro, with its steps |
+| `what does the start work macro do` | its steps, without running it |
+| `forget the study macro` | gone |
+
+A step is just **something you would say**. There is no second language to
+learn — each step goes back through the brain exactly as if you had spoken it,
+so anything Jarvis can do, a macro can do, including asking it things:
+
+> `create a macro called morning: what's the weather, what's on my list, how's the battery`
+
+Say `morning` and it reads you all three answers.
+
+Three built-ins ship with it — `start work`, `wind down` and `catch up` — and
+you can change or delete any of them. Yours live in `data/macros.json`;
+`macros.example.json` in the project root shows the shape, including `pause`
+for apps that are slow to take focus.
+
+Two things it deliberately will not do:
+
+> **It will not say yes for you.** If a step asks "shall I?", the macro skips
+> that step and tells you which one, rather than answering on your behalf. A
+> step you wrote yourself that maps to a plain rule still runs straight off —
+> writing it down in advance is as clear as asking gets.
+>
+> **It will not run itself.** A macro that names itself, or two that name each
+> other, would loop forever. It stops and says so.
+
+Saying a macro's name **on its own** beats every other rule — that is why
+`start work` opens your three apps instead of hunting for an app called
+"work". Anything more than the bare name goes to the normal rules, so calling
+a macro `notes` does not break `read me my notes`.
+
 Forgotten what it does? Just say **`help`**.
 
 ---
@@ -379,6 +420,7 @@ skills/
   names.py         Names speech recognition keeps getting wrong
   files.py         Searching and tidying
   memory.py        Notes, to-dos, reminders, timers
+  macros.py        One name, several commands -- the runner and the table
   knowledge.py     Weather (Open-Meteo), Wikipedia, search, arithmetic
   sysinfo.py       Battery, disk, focus mode
   winutil.py       Small helpers for talking to Windows
@@ -389,7 +431,7 @@ web/
   app.js           Listening and speaking
 
 data/              Your notes, to-dos, reminders, learned names, your own
-                   app recipes. Never committed.
+                   app recipes and macros. Never committed.
 .env               Your API key, if you add one. Never committed.
 ```
 
@@ -486,7 +528,6 @@ on an external monitor.
 ## Ideas for later
 
 - **Whisper for local speech-to-text** — makes Jarvis fully offline
-- **Macros** — say "start work" and get VS Code, Chrome and Spotify at once
 - **Launch on startup** — put a shortcut to `start.bat` in your Startup folder
 - **Control it from your phone** — change `HOST` to `0.0.0.0` in `jarvis.py`;
   it will hand you a key-protected link (see *Who can reach the server*)

@@ -10,11 +10,24 @@ broad ones near the bottom.
 import re
 
 import persona
-from skills import (desktop, files, keyboard, knowledge, memory, names, pc,
-                    recipes, sysinfo)
+from skills import (desktop, files, keyboard, knowledge, macros, memory, names,
+                    pc, recipes, sysinfo)
 
 # When Jarvis asks a question ("shall I?"), the answer waits here.
 _pending = {"action": None}
+
+
+def clear_pending() -> None:
+    """
+    Drop a question nobody is going to answer.
+
+    A macro runs its steps through handle(), and a step that comes back
+    asking "shall I?" leaves its question sitting here. The macro skips
+    that step -- so the question has to go too, or the next thing you say
+    gets read as the answer to something you were never asked.
+    """
+    _pending["action"] = None
+
 
 YES = re.compile(r"^\s*(yes|yeah|yep|yup|ok|okay|sure|do it|go ahead|please do|"
                  r"fine|alright|right|confirm)\b", re.I)
@@ -83,6 +96,36 @@ RULES = [
      lambda m, t: HELP_TEXT),
     (r"\b(thanks|thank you|cheers|appreciate it)\b",
      lambda m, t: _voice(persona.thanks())),
+
+    # ---- Macros: one name, several commands ------------------------------
+    # Every rule here says "macro" out loud, which is what keeps them from
+    # colliding with ordinary commands. Running one by its bare name is not
+    # here at all -- it happens in handle(), because a macro's name is
+    # whatever you chose it to be and no pattern written today could know it.
+    #
+    # Plural "macros" lists them; singular "macro" acts on one. That is the
+    # whole of how these five stay out of each other's way.
+    (r"\b(what|which|list|show|tell me)\b.*\b(macros|routines)\b|"
+     r"\b(macros|routines)\b.*\b(do i have|are there|list|show)\b",
+     lambda m, t: macros.listing()),
+    (r"\b(forget|delete|remove|drop|unlearn)\b.*\b(macro|routine)\b|"
+     r"\b(macro|routine)\b.*\b(forget|delete|remove|drop)\b",
+     lambda m, t: macros.forget(_macro_name(t))),
+    # "the|my" is doing real work in the last line. Without it, "explain
+    # macro economics" is read as a question about a macro called
+    # "economics" -- people say "macro" as half a longer word far more
+    # often than they ask about their own. With it, only "explain THE
+    # start work macro" lands here, which is how you would say it anyway.
+    (r"\b(what|show me|tell me)\b.*\b(macro|routine)\b.*\bdo(es)?\b|"
+     r"\bwhat('s| is)? in\b.*\b(the|my)\b.*\b(macro|routine)\b|"
+     r"\b(describe|explain)\b.*\b(the|my)\b.*\b(macro|routine)\b",
+     lambda m, t: macros.describe(_macro_name(t))),
+    (r"\b(create|make|add|new|define|save|set up|record|teach)\b.*"
+     r"\b(macro|routine|combo)\b",
+     lambda m, t: macros.teach(*macros.parse(t))),
+    (r"\b(run|do|play|fire up|trigger|execute|start)\b.*\b(macro|routine)\b|"
+     r"\b(macro|routine)\b.*\b(run|go)\b",
+     lambda m, t: _run_macro(t)),
 
     # ---- Teaching it names it keeps mishearing ---------------------------
     # Above everything else: "remember robbie is ravi" must not be read as
@@ -421,6 +464,36 @@ def _app_name(text: str) -> str:
     return re.sub(r"\s+", " ", name).strip(" .!?,")
 
 
+_MACRO_WORDS = (r"\b(run|do|does|play|fire up|fire|trigger|execute|start|go|"
+                r"forget|delete|remove|drop|unlearn|describe|explain|"
+                r"show me|show|tell me|what('s| is)?|in|of|"
+                r"the|a|an|my|macro|macros|routine|routines|combo|"
+                r"called|named|please)\b")
+
+
+def _macro_name(text: str) -> str:
+    """'forget the wind down macro' -> 'wind down'."""
+    name = re.sub(_MACRO_WORDS, " ", text, flags=re.I)
+    return re.sub(r"\s+", " ", name).strip(" .!?,")
+
+
+def _run_macro(text: str) -> dict:
+    """
+    'run my start work macro' -- the name is whatever is left over.
+
+    Loose matching is right here and wrong for a bare name: you have
+    already said the word macro, so guessing at "work" is helpful rather
+    than dangerous.
+    """
+    name = _macro_name(text)
+    target = macros.resolve(name, loose=True) if name else ""
+    if not target:
+        return {"speak": f"I have no macro called '{name or 'that'}'. "
+                         f"Say 'list macros' to hear the ones I have.",
+                "failed": True}
+    return macros.run(target)
+
+
 def _find_files(text: str):
     """
     A name was given -- search by name ("find my resume").
@@ -624,7 +697,9 @@ HELP_TEXT = (
     "lock the laptop, find files, tidy your Downloads folder, keep notes and a "
     "to-do list, set timers and reminders, check the weather, look things up on "
     "Wikipedia, search Google and YouTube, do arithmetic, and report on battery "
-    "and disk space. There are examples below -- click one to try it."
+    "and disk space. I can also run macros -- one name for several commands, "
+    "like 'start work'. Say 'list my macros' to hear them. There are examples "
+    "below -- click one to try it."
 )
 
 
@@ -632,7 +707,14 @@ HELP_TEXT = (
 # The main job: text in, answer out.
 # ---------------------------------------------------------------------------
 
-def handle(raw_text: str) -> dict:
+def handle(raw_text: str, decorate: bool = True) -> dict:
+    """
+    Text in, answer out.
+
+    `decorate` is off only when a macro is running its own steps: the
+    personality belongs on the one answer the macro gives at the end, not
+    sprinkled through every line inside it.
+    """
     text = clean(raw_text)
     if not text:
         return _voice("I did not catch that. Say it again.")
@@ -645,15 +727,28 @@ def handle(raw_text: str) -> dict:
         _pending["action"] = None
         if YES.match(text):
             if waiting["skill"] == "files.organize":
-                return _finish(_as_reply(files.organize(waiting["folder"], do_it=True)))
+                return _finish(_as_reply(files.organize(waiting["folder"], do_it=True)),
+                               decorate)
             if waiting["skill"] == "recipes.send":
-                return _finish(_as_reply(recipes.send_typed_message()))
+                return _finish(_as_reply(recipes.send_typed_message()), decorate)
             if waiting["skill"] == "ai.run":
                 return _finish(_as_reply(
-                    ai.run_confirmed(waiting["action"], waiting["target"])))
+                    ai.run_confirmed(waiting["action"], waiting["target"])),
+                    decorate)
         if NO.match(text):
             return _voice(persona.declined())
         # Neither yes nor no, so treat it as a fresh command.
+
+    # A macro's name is one you chose, so it outranks the whole rule list.
+    # Without this, "start work" would be read by the broad open rule as
+    # "start" plus an app called "work" -- and every macro you ever name
+    # with an ordinary verb in it would be stolen by some rule below.
+    #
+    # Safe only because the match is strict: the entire sentence has to be
+    # the macro's name. "start work" runs it; "what's in start work" does not.
+    named = macros.resolve(text)
+    if named:
+        return _finish(_as_reply(macros.run(named)), decorate)
 
     for pattern, action in RULES:
         match = re.search(pattern, text, re.I)
@@ -670,24 +765,24 @@ def handle(raw_text: str) -> dict:
         if result.get("failed") and ai.is_on():
             second = ai.ask_ai(text)
             if second and not second.get("failed"):
-                return _finish(_as_reply(second))
+                return _finish(_as_reply(second), decorate)
 
-        return _finish(result)
+        return _finish(result, decorate)
 
     # Nothing matched at all -- straight to the AI brain.
     if ai.is_on():
         answer = ai.ask_ai(text)
         if answer:
-            return _finish(_as_reply(answer))
+            return _finish(_as_reply(answer), decorate)
 
     return reply(persona.unknown(), unknown=True, no_flavor=True)
 
 
-def _finish(result: dict) -> dict:
+def _finish(result: dict, decorate: bool = True) -> dict:
     """Remember any pending question, then add the personality."""
     if result.get("needs_confirm") and result.get("confirm_action"):
         _pending["action"] = result["confirm_action"]
 
-    if not result.get("no_flavor"):
+    if decorate and not result.get("no_flavor"):
         result["speak"] = persona.flavor(result.get("speak", ""))
     return result

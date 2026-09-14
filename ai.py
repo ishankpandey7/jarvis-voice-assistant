@@ -23,7 +23,7 @@ import time
 import urllib.request
 from pathlib import Path
 
-from skills import files, keyboard, knowledge, memory, pc, sysinfo
+from skills import files, keyboard, knowledge, macros, memory, pc, sysinfo
 
 HERE = Path(__file__).resolve().parent
 ENV_FILE = HERE / ".env"
@@ -87,6 +87,7 @@ ACTIONS = {
     "search_in_browser": lambda arg: keyboard.search_in_browser(arg),
     "focus_window": lambda arg: keyboard.focus_window(arg),
     "press_key": lambda arg: keyboard.press(arg),
+    "run_macro": lambda arg: macros.run(macros.resolve(arg, loose=True) or arg),
 }
 
 ACTION_NAMES = sorted(ACTIONS) + ["answer"]
@@ -117,10 +118,28 @@ Output ONLY the action and its target. Never answer the question yourself.
   search_in_browser  search the web in the open browser. target = the query
   focus_window bring a program's window to the front. target = its name
   press_key    press a key or combo. target = e.g. "enter", "ctrl+t", "pagedown"
+  run_macro    run a saved group of commands. target = the macro's name
   answer       a general question or chit-chat needing no action. target = ""
 
 Pick "answer" only when no action above fits. Never guess a target you were
 not given -- leave it empty instead."""
+
+
+def _router_prompt() -> str:
+    """
+    The router prompt, plus the macros that exist right now.
+
+    Macro names are invented by the user and change while Jarvis is
+    running, so they cannot sit in the constant above -- the model has to
+    be told the current list or it has no way to fill in a target.
+    """
+    saved = macros.known()
+    if not saved:
+        return ROUTER_PROMPT
+    listed = "\n  ".join(saved)
+    return (ROUTER_PROMPT + "\n\nMacros that exist, for run_macro. Use one of "
+            "these names exactly, and only when what was said clearly means "
+            "that whole group:\n  " + listed)
 
 ROUTER_SCHEMA = {
     "type": "object",
@@ -225,7 +244,7 @@ def _ollama_chat(system: str, user: str, schema=None, timeout: int = 60):
 
 
 def _ask_local(text: str):
-    raw = _ollama_chat(ROUTER_PROMPT, text, schema=ROUTER_SCHEMA)
+    raw = _ollama_chat(_router_prompt(), text, schema=ROUTER_SCHEMA)
     if raw is None:
         return None
 
@@ -294,7 +313,7 @@ def _ask_claude(text: str):
         response = client.beta.messages.create(
             model=CLAUDE_MODEL,
             max_tokens=1000,
-            system=ROUTER_PROMPT + "\n\n" + _talk_prompt(),
+            system=_router_prompt() + "\n\n" + _talk_prompt(),
             messages=[{"role": "user", "content": text}],
             # A voice assistant has to feel quick, so keep effort low.
             output_config={
@@ -346,6 +365,12 @@ NEEDS_CONFIRM = {
     # characters in the middle of someone's work. The question names the
     # window on purpose -- that is the part you need to see before saying yes.
     "type_text": "Type “{target}” into {window}?",
+    # A macro is several commands at once and can hold anything you put in
+    # it, so a guess at WHICH macro is a guess worth checking. Saying its
+    # name by itself runs it immediately -- that was never a guess.
+    # The question lists the steps, because "shall I?" is only a fair
+    # question when you can see what you are agreeing to.
+    "run_macro": "Run the macro '{target}'? It will: {steps}.",
 }
 
 
@@ -353,9 +378,21 @@ def _run(action: str, target: str, via: str) -> dict:
     """Do the chosen job. The spoken line is the SKILL's, never the model's."""
     import persona
 
+    if action == "run_macro":
+        # Resolve the name before asking, so the question can list the real
+        # steps -- and so an invented macro name is answered plainly rather
+        # than becoming a question about something that does not exist.
+        found = macros.resolve(target, loose=True)
+        if not found:
+            return {"speak": f"I have no macro called '{target}'. Say "
+                             f"'list macros' to hear the ones I have.",
+                    "via": via, "no_flavor": True}
+        target = found
+
     if action in NEEDS_CONFIRM:
         question = NEEDS_CONFIRM[action].format(
             target=target or "that app",
+            steps=macros.preview(target),
             window=keyboard.active_window() or "the window in front")
         return {
             "speak": f"{question} Say yes if so.",

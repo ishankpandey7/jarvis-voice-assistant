@@ -68,10 +68,15 @@ function showAnswer(data) {
     label.textContent = row.name || "";
     item.appendChild(label);
 
-    const meta = row.size || row.modified;
+    // A file row carries a size or a date; a macro's step carries what that
+    // step actually said. Same slot, but very different lengths -- a size
+    // is three characters and a step's answer is a whole sentence, so the
+    // long kind gets a class that lets it wrap instead of shoving the
+    // label off the row.
+    const meta = row.size || row.modified || row.note;
     if (meta) {
       const tag = document.createElement("span");
-      tag.className = "meta";
+      tag.className = row.note && !row.size && !row.modified ? "meta note" : "meta";
       tag.textContent = meta;
       item.appendChild(tag);
     }
@@ -982,7 +987,7 @@ const SUGGESTIONS = [
   "open chrome", "take a screenshot", "how's the battery",
   "clean up downloads", "set a 10 minute timer", "what's the weather",
   "set volume to 40", "focus mode", "find my resume",
-  "what's on my list", "what's taking up space", "help",
+  "what's on my list", "what's taking up space", "list my macros", "help",
 ];
 
 SUGGESTIONS.forEach((text) => {
