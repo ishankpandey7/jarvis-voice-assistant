@@ -74,6 +74,28 @@ a generic Ctrl+F search, which is right more often than you would expect.
 and edit. Your entries merge over the built-ins, and your `actions` are added
 to theirs rather than replacing them. No code, and a restart picks it up.
 
+#### Names it keeps mishearing
+
+Speech recognition is an English model listening to Indian names, and it
+mangles them the same way every time: Ravi comes back as *Robbie*, Shreya as
+*Shreyer*. The transcript is already wrong before Jarvis sees it, so nothing
+downstream can rescue it — but the mistakes repeat, so they can be learned.
+
+| Say | What happens |
+|---|---|
+| `remember robbie is Ravi` | from now on that word is written Ravi |
+| `when I say shreyer I mean Shreya` | same thing, said differently |
+| `what names do you know` | the list so far |
+| `forget robbie` | drops it |
+
+For anything it has *not* been taught, it types only the **first four letters**
+into the search box. `Isha` finds Ishank whether or not the ending was heard
+right, because the start of a name survives mis-hearing much better than the
+whole of it, and search boxes match prefixes. When what it typed differs from
+what you said, it tells you: *Searched telegram for Isha, looking for Ishank.*
+
+Learned names live in `data/names.json`, which is never committed.
+
 ### Work inside whatever app is in front
 Jarvis drives the real keyboard, so these go to the focused window whatever
 it is.
@@ -331,6 +353,7 @@ skills/
   pc.py            Apps, volume, brightness, screenshots, lock, clipboard
   keyboard.py      Typing, key combos, switching windows
   recipes.py       What each app's own shortcuts are -- the table to edit
+  names.py         Names speech recognition keeps getting wrong
   files.py         Searching and tidying
   memory.py        Notes, to-dos, reminders, timers
   knowledge.py     Weather (Open-Meteo), Wikipedia, search, arithmetic
@@ -342,7 +365,8 @@ web/
   style.css        The look, including the Ultron repaint
   app.js           Listening and speaking
 
-data/              Your notes, to-dos, reminders. Never committed.
+data/              Your notes, to-dos, reminders, learned names, your own
+                   app recipes. Never committed.
 .env               Your API key, if you add one. Never committed.
 ```
 
@@ -407,6 +431,12 @@ name is needed.
 
 **"Port 8765 is already in use"** — Jarvis is already running. Close the old
 window, or change `PORT` in `jarvis.py`.
+
+**It searches again, with the wrong spelling** — two different faults wearing
+one face. Pressing a search shortcut when the box is already open does not
+clear it, so the new name got appended to the last one; that is fixed. The
+spelling itself is speech recognition, not Jarvis — teach it the name (above),
+or say a shorter version.
 
 **It opens the app again instead of doing the thing inside it** — this was a
 real bug and it is fixed, but the cause is worth knowing. Telegram, Discord and

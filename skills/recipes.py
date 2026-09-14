@@ -24,6 +24,7 @@ import time
 from pathlib import Path
 
 from . import keyboard as kb
+from . import names
 from . import pc
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
@@ -270,26 +271,49 @@ def _still_focused(hint: str) -> bool:
 
 # ------------------------------------------------------------- Doing something
 
-def find_in_app(app: str, query: str) -> dict:
-    """Open something by name inside an app: a chat, a file, a playlist."""
+def find_in_app(app: str, query: str, is_name: bool = False) -> dict:
+    """
+    Open something by name inside an app: a chat, a file, a playlist.
+
+    `is_name` says the query is a person, which changes what gets typed --
+    see names.py. A mis-heard person's name is the common failure, and
+    typing fewer letters of it is the fix.
+    """
     query = query.strip()
     if not query:
         return {"speak": f"What should I look for in {app}?", "failed": True}
+
+    typed = names.search_key(query) if is_name else query
 
     ok, title = ensure_app(app)
     if not ok:
         return {"speak": f"I could not get {app} on screen.", "failed": True}
 
     plan = recipe_for(app)
+
+    # Close anything already open before searching. Pressing the search key
+    # when a search box is ALREADY up does not start fresh -- it just puts
+    # the cursor there, and the new name gets appended to whatever was left
+    # from last time. That is what "it searched again, with the wrong
+    # spelling" looks like from outside.
+    kb.press("escape")
+    time.sleep(0.2)
+
     kb.press(plan["search_key"])
     time.sleep(0.35)                               # the search box needs a beat
-    kb.type_text(query)
+    kb.press("ctrl+a")                             # select whatever is in there
+    time.sleep(0.1)                                # so typing replaces it
+    kb.type_text(typed)
     time.sleep(plan.get("settle", 0.6))            # and the results need longer
 
     for key in plan.get("after_search", ["enter"]):
         kb.press(key)
         time.sleep(0.15)
 
+    # Say what was actually typed when it differs, so a wrong match is
+    # explainable instead of mysterious.
+    if typed.lower() != query.lower():
+        return {"speak": f"Searched {app} for {typed}, looking for {query}."}
     return {"speak": f"Opened {query} in {app}."}
 
 
@@ -333,7 +357,7 @@ def write_message(app: str, who: str, message: str) -> dict:
     if not message:
         return {"speak": "What should the message say?", "failed": True}
 
-    opened = find_in_app(app, who)
+    opened = find_in_app(app, who, is_name=True)
     if opened.get("failed"):
         return opened
 

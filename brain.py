@@ -10,7 +10,8 @@ broad ones near the bottom.
 import re
 
 import persona
-from skills import files, keyboard, knowledge, memory, pc, recipes, sysinfo
+from skills import (files, keyboard, knowledge, memory, names, pc, recipes,
+                    sysinfo)
 
 # When Jarvis asks a question ("shall I?"), the answer waits here.
 _pending = {"action": None}
@@ -82,6 +83,19 @@ RULES = [
      lambda m, t: HELP_TEXT),
     (r"\b(thanks|thank you|cheers|appreciate it)\b",
      lambda m, t: _voice(persona.thanks())),
+
+    # ---- Teaching it names it keeps mishearing ---------------------------
+    # Above everything else: "remember robbie is ravi" must not be read as
+    # a reminder, and the words people use here are common ones.
+    (r"\b(remember|learn|note) (that )?\"?([\w']+)\"? (is|means|should be) \"?([\w' ]+)\"?",
+     lambda m, t: names.teach(m.group(3), m.group(5))),
+    (r"\b(when i say|if i say) \"?([\w']+)\"? (i mean|write|use) \"?([\w' ]+)\"?",
+     lambda m, t: names.teach(m.group(2), m.group(4))),
+    (r"\bforget (the name )?\"?([\w']+)\"?$",
+     lambda m, t: names.forget(m.group(2))),
+    (r"\bwhat names\b|\bnames (do you|have you) (know|learned)\b|"
+     r"\blist (the )?names\b",
+     lambda m, t: names.listing()),
 
     # ---- Time and date ---------------------------------------------------
     (r"\b(what('s| is)? the time|what time is it|time is it|current time)\b",
@@ -488,7 +502,9 @@ def _open_chat(text: str) -> dict:
     who = re.sub(r"\s+", " ", who).strip(" .!?,")
     if not who:
         return {"speak": f"Whose chat should I open in {app}?", "failed": True}
-    return recipes.find_in_app(app, who)
+    # is_name matters: a person's name is what speech recognition gets
+    # wrong most, so it gets the shortening and alias treatment.
+    return recipes.find_in_app(app, who, is_name=True)
 
 
 def _do_inside(text: str, app: str) -> dict:
