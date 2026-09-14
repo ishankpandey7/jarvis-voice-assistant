@@ -99,6 +99,24 @@ silently did nothing until it went through `Invoke-CimMethod`.
 scanning the Start Menu folder for `.lnk` can never find them. `pc.py` uses
 `Get-StartApps` and launches through `shell:AppsFolder`.
 
+**"Open notepad" does not give you a blank Notepad.** Windows 11 Notepad is
+single-instance with session restore, so launching it surfaces whatever was
+open last — with a real file in it. Same family as the tray problem below:
+`open X` does not mean "a fresh X".
+
+This is how a blind `type` / `likho` finds someone's work. It bit me: a test
+said "open notepad", got back a window called `agents.py - Notepad`, checked
+the title contained "notepad", decided that was good enough, and typed into
+a file on the Desktop. Nothing was lost — the edits were buffer-only and the
+force-close discarded them — but only by luck.
+
+The lesson is that **Jarvis already told me and I ignored it.** Its reply was
+*Typed "hello duniya" into agents.py - Notepad.* Naming the window is the
+safety feature, and it only works if the window name is actually read. When
+testing anything that types, check the FULL window title against what you
+expected, not a substring — and prefer opening a scratch file by path over
+trusting an app to start empty.
+
 **Tray-minimised apps have no visible window.** Telegram, Discord and WhatsApp
 run with no window at all, so focusing one fails and relaunching is what
 restores it. `recipes.ensure_app()` relaunches, then waits for the window.
@@ -186,6 +204,22 @@ being retyped each time. **88 pass.** Three parts:
 
 It opens no apps, presses no keys and never touches `data/`. If the server
 is not running it skips the live part rather than failing. Add to it.
+
+**`python router_score.py`** — how often the local model picks the right
+action. Takes ~3 minutes (`--quick` for a third). It was 70% before the
+router prompt was rewritten, 96% after, and the interesting output is the
+bucket each phrase falls into:
+
+- **RULE** — brain.py catches it, the model is never asked. Safe either way.
+- **SAVED** — the rules miss it, the model gets it right. The AI earning its keep.
+- **GAP** — the rules miss it *and* the model is wrong. Fix these.
+- **RISKY** — same, but the model chose something irreversible.
+
+A **SAVED** line you say often is the best candidate for a new rule: it works
+already, but it costs 3–10 seconds instead of 0.1. That loop — score it, add
+a rule, score it again — is worth more than any single rule in it.
+
+Hindi commands came out of exactly that loop, not a guess. See the README.
 
 The pattern underneath, if you want a one-off: start the server, then POST
 to `/api/command` with assertions.

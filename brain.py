@@ -446,6 +446,32 @@ RULES = [
     #
     # They sit here, below every specific English rule and just above the
     # broad open/close, so nothing above loses a sentence to them.
+    # Asking about things. These went to the model before -- "kitni jagah
+    # bachi hai" took nine seconds on a cold model to say what sysinfo.disk()
+    # knows instantly. Some Hindi questions need no rule at all, because the
+    # English word is right there in the sentence: "storage kitna hai",
+    # "internet chal raha hai" and "kitni battery bachi hai" were already
+    # caught by the storage, internet and battery rules above.
+    (r"\bkitne? baje\b|\b(time|samay|waqt)\b.*\b(kya|kitna)\b|"
+     r"\bkya (time|samay|waqt)\b",
+     lambda m, t: knowledge.clock("time")),
+    (r"\b(tareekh|tarikh)\b|\b(aaj|aj)\b.*\b(kaunsa|kaunsi|kya)\b.*\bdin\b",
+     lambda m, t: knowledge.clock("date")),
+    (r"\bmausam\b|\bbaarish|\bbarish",
+     lambda m, t: knowledge.weather(_city(t))),
+    (r"\b(jagah|space)\b.*\b(kitni|kitna|bachi|bacha|khali)\b|"
+     r"\bkitni\b.*\b(jagah|space)\b",
+     lambda m, t: sysinfo.disk()),
+    # "lock" is the anchor, not "kar do" -- "laptop band kar do" is a
+    # different request (shut it down) and must not land here by accident.
+    (r"\block\b.*\bkar\s?(do|de|den)\b|\block\s?(karo|kardo)\b",
+     lambda m, t: pc.lock_pc()),
+    (r"\b(kya kya|kaun\s?se|kaunse)\b.*\b(chal rah[ae]|khul[ae]|app|program)\b|"
+     r"\bkya chal rah[ae] hai\b",
+     lambda m, t: sysinfo.running_apps()),
+    (r"\byaad\b.*\b(dila|dilana|dilado|dila do)\b",
+     lambda m, t: memory.add_reminder(_reminder_text(t), t)),
+
     (r"\b(bandh?|bund)\s+(karo|kar do|kar den|kardo|kar)\b",
      lambda m, t: pc.close_app(_app_name(t))),
     (r"\b(kholo|khol do|kholdo|chaalu|chalu|shuru)\b",
@@ -459,6 +485,11 @@ RULES = [
     (r"\b(gaana|gana|gaane|music|song)\b.*\bchala(o|do)\b|"
      r"\bchala(o|do)\b.*\b(gaana|gana|gaane)\b",
      lambda m, t: pc.media("play")),
+    # "note likho milk lena hai" is a note, not something to type into
+    # whatever window happens to be in front. It has to sit above the bare
+    # likho rule, or the broader one takes it and types into your editor.
+    (r"\bnote\b.*\blikh(o|do| do)\b|\blikh(o|do| do)\b.*\bnote\b",
+     lambda m, t: memory.add_note(_after(t, r"likh(?:o|do| do)"))),
     (r"\blikh(o|do| do)\b",
      lambda m, t: keyboard.type_text(_after(t, r"likh(?:o|do| do)"))),
 
@@ -716,7 +747,15 @@ def _reminder_text(text: str) -> str:
                   " ", body, flags=re.I)
     body = re.sub(r"\b(tomorrow|today|tonight|morning|evening|night|later|"
                   r"o'clock|a|an|the)\b", " ", body, flags=re.I)
+    # The same lead-in words in Hindi, so "yaad dila dena 10 minute mein
+    # dawai lene ki" reads back as "dawai lene ki" rather than repeating
+    # the request at you when it fires. "ki"/"ka" only go at the very end,
+    # where they are grammar -- inside the sentence they carry meaning.
+    body = re.sub(r"\b(yaad|dila|dilana|dila dena|dena|dilado|mujhe|"
+                  r"mein|me|ko|baad|kal|aaj|subah|shaam|raat)\b",
+                  " ", body, flags=re.I)
     body = re.sub(r"\s+", " ", body).strip(" .!?,")
+    body = re.sub(r"\s+(ki|ka|ke)$", "", body, flags=re.I).strip(" .!?,")
     return body or "Reminder"
 
 

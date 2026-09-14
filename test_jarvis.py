@@ -157,6 +157,21 @@ for phrase, skill, target in [
     ("awaaz kam karo", 'pc.volume("down")', ""),
     ("gaana chalao", 'pc.media("play")', ""),
     ("likho hello world", "keyboard.type_text", "hello world"),
+    # Asking-type commands, which used to cost a round trip to the model
+    ("kitni jagah bachi hai", "sysinfo.disk", ""),
+    ("jagah kitni hai", "sysinfo.disk", ""),
+    ("laptop lock kar do", "pc.lock_pc", ""),
+    ("screen lock karo", "pc.lock_pc", ""),
+    ("mausam kaisa hai", "knowledge.weather", ""),
+    ("baarish hogi kya", "knowledge.weather", ""),
+    ("kitne baje hain", 'knowledge.clock("time")', ""),
+    ("samay kya hai", 'knowledge.clock("time")', ""),
+    ("tareekh kya hai", 'knowledge.clock("date")', ""),
+    ("kya kya chal raha hai", "sysinfo.running_apps", ""),
+    ("kaun se app khule hain", "sysinfo.running_apps", ""),
+    ("yaad dila dena dawai lene ki", "memory.add_reminder", ""),
+    # A note is a note, even though it says likho
+    ("note likho milk lena hai", "memory.add_note", ""),
 ]:
     index = which_rule(phrase)
     ok = skill in rule_source(index)

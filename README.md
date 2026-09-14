@@ -182,7 +182,19 @@ the AI:
 | `mera resume dhundo` / `dhoondo my thesis` | searches for the file |
 | `awaaz badhao` / `awaaz kam karo` | volume up / down |
 | `gaana chalao` | play/pause |
-| `likho hello world` | types it |
+| `likho hello world` | types it into the window in front |
+| `note likho milk lena hai` | saves a **note** — not typed into a window |
+| `kitni jagah bachi hai` | disk space |
+| `kitne baje hain` / `samay kya hai` / `tareekh kya hai` | time and date |
+| `mausam kaisa hai` / `baarish hogi kya` | weather |
+| `kya kya chal raha hai` / `kaun se app khule hain` | what's open |
+| `laptop lock kar do` | locks it |
+| `yaad dila dena 10 minute mein dawai lene ki` | reminder |
+
+Some Hindi needs no rule at all, because the English word is sitting in the
+sentence: `storage kitna hai`, `internet chal raha hai` and
+`kitni battery bachi hai` were already caught by the storage, internet and
+battery rules.
 
 These exist because they were **measured**, not guessed. `router_score.py`
 scores how often the local model picks the right action, and it showed
