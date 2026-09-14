@@ -10,8 +10,8 @@ broad ones near the bottom.
 import re
 
 import persona
-from skills import (files, keyboard, knowledge, memory, names, pc, recipes,
-                    sysinfo)
+from skills import (desktop, files, keyboard, knowledge, memory, names, pc,
+                    recipes, sysinfo)
 
 # When Jarvis asks a question ("shall I?"), the answer waits here.
 _pending = {"action": None}
@@ -239,6 +239,43 @@ RULES = [
         m.group(1).strip().replace(" plus ", "+").replace(" ", "+"))),
     (r"\bwhat('s| is) (in front|focused|open right now)\b|\bwhich window\b",
      lambda m, t: f"{keyboard.active_window() or 'Nothing'} is in front."),
+
+    # ---- Windows' own shortcuts and settings pages -----------------------
+    # Asking what exists comes before asking to open one, or "list settings"
+    # is read as a page named "list".
+    (r"\bwhat (windows )?shortcuts\b|\blist (windows )?shortcuts\b|"
+     r"\bwhat can you press\b",
+     lambda m, t: "Windows shortcuts I know, among others: "
+                  + ", ".join(SHORTCUT_HIGHLIGHTS) + "."),
+    (r"\bwhat settings\b|\blist settings\b|\bwhich settings\b",
+     lambda m, t: "Settings pages I can open directly: "
+                  + ", ".join(desktop.known_settings()[:20]) + "."),
+    # Then opening one: "open bluetooth settings" should land on that page,
+    # not be read as an app called bluetooth.
+    (r"\b(open|show|go to|take me to)?\s*([a-z ]+?)\s+settings\b|"
+     r"\bsettings for ([a-z ]+)$",
+     lambda m, t: desktop.settings(_settings_page(t))),
+    (r"\b(snip|screenshot (the )?area|capture (a )?region|select (an )?area)\b",
+     lambda m, t: desktop.shortcut("snip")),
+    (r"\bclipboard history\b|\bwhat did i copy before\b",
+     lambda m, t: desktop.shortcut("clipboard history")),
+    (r"\b(emoji|emojis)\b", lambda m, t: desktop.shortcut("emoji")),
+    (r"\b(show (the )?desktop|minimi[sz]e everything|hide everything)\b",
+     lambda m, t: desktop.shortcut("show desktop")),
+    (r"\b(task view|show (all )?windows)\b",
+     lambda m, t: desktop.shortcut("task view")),
+    (r"\btask manager\b", lambda m, t: desktop.shortcut("task manager")),
+    (r"\bsnap (it |this |the window )?(to the )?(left|right)\b",
+     lambda m, t: desktop.shortcut("snap " + m.group(3))),
+    (r"\b(new|next|previous) desktop\b",
+     lambda m, t: desktop.shortcut(m.group(1) + " desktop")),
+    (r"\b(next|other|second) (monitor|screen|display)\b",
+     lambda m, t: desktop.shortcut("next monitor")),
+    (r"\b(second screen|project|extend (the )?display)\b",
+     lambda m, t: desktop.shortcut("project")),
+    (r"\b(start (menu|recording)|record (the )?screen|game bar)\b",
+     lambda m, t: desktop.shortcut(
+         "record screen" if "record" in t.lower() else "game bar")),
 
     # ---- Machine control -------------------------------------------------
     (r"\b(screenshot|screen shot|screen capture|capture the screen|"
@@ -536,6 +573,13 @@ def _message(text: str) -> dict:
     return recipes.write_message(app, who, body)
 
 
+def _settings_page(text: str) -> str:
+    """'open bluetooth settings' -> 'bluetooth'."""
+    body = re.sub(r"\b(open|show|go to|take me to|the|my|settings|for|page|"
+                  r"please)\b", " ", text, flags=re.I)
+    return re.sub(r"\s+", " ", body).strip(" .!?,")
+
+
 def _typed_text(text: str) -> str:
     """'type hello world' -> 'hello world', quotes stripped if they used any."""
     body = _after(text, r"\b(type|write|enter)\b\s*(out)?\s*(:)?")
@@ -564,6 +608,15 @@ def _play_music(text: str) -> str:
     if len(song) > 2:
         return knowledge.youtube(song)
     return pc.media("play")
+
+
+# The ones worth saying out loud, rather than the whole alphabetical list.
+# There are more in skills/desktop.py.
+SHORTCUT_HIGHLIGHTS = [
+    "snip", "clipboard history", "emoji", "show the desktop", "task view",
+    "task manager", "snap left", "snap right", "new desktop", "next desktop",
+    "second screen", "record screen",
+]
 
 
 HELP_TEXT = (

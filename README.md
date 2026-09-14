@@ -61,8 +61,9 @@ and what their own shortcuts are.
 | `which apps can you work in` | the whole list |
 
 Built in: Telegram, WhatsApp, Discord, Slack, Teams, Outlook, Chrome, Edge,
-VS Code, Obsidian, Spotify, Notepad, File Explorer. Anything else falls back to
-a generic Ctrl+F search, which is right more often than you would expect.
+Firefox, Brave, VS Code, Obsidian, Notion, Spotify, VLC, Zoom, Steam, Word,
+Excel, PowerPoint, Notepad, File Explorer. Anything else falls back to a
+generic Ctrl+F search, which is right more often than you would expect.
 
 > **It never sends a message.** `message ravi saying I'm late` opens the chat
 > and types the words, then stops:
@@ -116,6 +117,27 @@ it is.
 > you: *Typed "hello" into agents.py - Notepad.* And if the **AI** guessed
 > that you wanted typing — rather than a rule matching plainly — it asks
 > first, naming the window before it touches anything.
+
+### Windows itself
+The shortcuts and settings pages that exist no matter which app is in front.
+
+| Say | What happens |
+|---|---|
+| `snip` / `screenshot the area` | the region-select tool (Win+Shift+S) |
+| `clipboard history` | everything you copied recently (Win+V) |
+| `emoji` | the emoji picker |
+| `show the desktop` / `task view` / `task manager` | getting around |
+| `snap left` / `snap right` | window to half the screen |
+| `new desktop` / `next desktop` | virtual desktops |
+| `second screen` | the projection menu |
+| `record screen` | Game Bar recording |
+| `open bluetooth settings` | straight to that page, not the front door |
+| `microphone settings` / `wifi settings` / `night light settings` | same |
+| `what windows shortcuts do you know` / `list settings` | what it knows |
+
+Around 40 shortcuts and 40 settings pages, in `skills/desktop.py`. Settings
+pages open directly through Windows' own `ms-settings:` links, so
+`open storage settings` lands on the page instead of making you hunt for it.
 
 ### Files
 | Say | What happens |
@@ -353,6 +375,7 @@ skills/
   pc.py            Apps, volume, brightness, screenshots, lock, clipboard
   keyboard.py      Typing, key combos, switching windows
   recipes.py       What each app's own shortcuts are -- the table to edit
+  desktop.py       Windows' own shortcuts and its settings pages
   names.py         Names speech recognition keeps getting wrong
   files.py         Searching and tidying
   memory.py        Notes, to-dos, reminders, timers

@@ -141,6 +141,67 @@ DEFAULTS = {
         "actions": {"new tab": "ctrl+t", "save": "ctrl+s",
                     "find": "ctrl+f", "replace": "ctrl+h", "word wrap": "alt+o"},
     },
+    "firefox": {
+        "search_key": "ctrl+l", "after_search": ["enter"], "settle": 0.3,
+        "actions": {"new tab": "ctrl+t", "close tab": "ctrl+w",
+                    "private": "ctrl+shift+p", "bookmark": "ctrl+d",
+                    "find": "ctrl+f", "reader": "f9", "full screen": "f11"},
+    },
+    "brave": {
+        "search_key": "ctrl+l", "after_search": ["enter"], "settle": 0.3,
+        "actions": {"new tab": "ctrl+t", "close tab": "ctrl+w",
+                    "private": "ctrl+shift+n", "bookmark": "ctrl+d",
+                    "find": "ctrl+f", "full screen": "f11"},
+    },
+
+    # ------------------------------------------------------------ office
+    "word": {
+        "search_key": "ctrl+f", "after_search": ["enter"], "settle": 0.5,
+        "actions": {"save": "ctrl+s", "bold": "ctrl+b", "italic": "ctrl+i",
+                    "underline": "ctrl+u", "replace": "ctrl+h",
+                    "word count": "ctrl+shift+g", "print": "ctrl+p",
+                    "new": "ctrl+n", "heading": "ctrl+alt+1"},
+    },
+    "excel": {
+        "search_key": "ctrl+f", "after_search": ["enter"], "settle": 0.5,
+        "actions": {"save": "ctrl+s", "new sheet": "shift+f11",
+                    "sum": "alt+equals", "filter": "ctrl+shift+l",
+                    "bold": "ctrl+b", "find": "ctrl+f", "go to": "ctrl+g",
+                    "format cells": "ctrl+1"},
+    },
+    "powerpoint": {
+        "search_key": "ctrl+f", "after_search": ["enter"], "settle": 0.5,
+        "actions": {"save": "ctrl+s", "new slide": "ctrl+m",
+                    "present": "f5", "present from here": "shift+f5",
+                    "duplicate slide": "ctrl+d", "notes": "ctrl+shift+h"},
+    },
+
+    # ----------------------------------------------------------- the rest
+    "zoom": {
+        "search_key": "ctrl+f", "after_search": ["enter"], "settle": 0.6,
+        "actions": {"mute": "alt+a", "camera": "alt+v", "share": "alt+s",
+                    "chat": "alt+h", "participants": "alt+u",
+                    "record": "alt+r", "leave": "alt+q",
+                    "full screen": "alt+f"},
+    },
+    "vlc": {
+        "search_key": "ctrl+f", "after_search": ["enter"], "settle": 0.4,
+        "actions": {"play": "space", "full screen": "f",
+                    "subtitles": "v", "audio track": "b",
+                    "speed up": "closebracket", "slow down": "openbracket",
+                    "snapshot": "shift+s", "open file": "ctrl+o"},
+    },
+    "steam": {
+        "search_key": "ctrl+f", "after_search": ["enter"], "settle": 0.8,
+        "actions": {"library": "ctrl+2", "store": "ctrl+1",
+                    "friends": "ctrl+4", "downloads": "ctrl+5"},
+    },
+    "notion": {
+        "search_key": "ctrl+p", "after_search": ["enter"], "settle": 0.7,
+        "actions": {"search": "ctrl+p", "new page": "ctrl+n",
+                    "sidebar": "ctrl+backslash", "dark mode": "ctrl+shift+l",
+                    "back": "ctrl+openbracket"},
+    },
 
     # Anything not listed falls back to this, which is right more often
     # than you would expect -- Ctrl+F is close to universal.
