@@ -114,7 +114,7 @@ it is.
 | `what's in front` | tells you which window has focus |
 
 > Typing lands in whichever window is focused, so Jarvis names it back to
-> you: *Typed "hello" into agents.py - Notepad.* And if the **AI** guessed
+> you: *Typed "hello" into draft.txt - Notepad.* And if the **AI** guessed
 > that you wanted typing — rather than a rule matching plainly — it asks
 > first, naming the window before it touches anything.
 

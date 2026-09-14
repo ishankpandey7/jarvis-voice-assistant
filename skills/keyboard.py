@@ -212,7 +212,7 @@ def _title_score(want: str, title: str) -> int:
     and picking the wrong one means typing into someone's work.
     """
     low = title.lower()
-    app = low.rsplit(" - ", 1)[-1].strip()         # "agents.py - Notepad" -> "notepad"
+    app = low.rsplit(" - ", 1)[-1].strip()         # "draft.txt - Notepad" -> "notepad"
     doc = low.rsplit(" - ", 1)[0].strip() if " - " in low else ""
 
     score = 0
