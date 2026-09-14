@@ -252,6 +252,38 @@ Saying a macro's name **on its own** beats every other rule — that is why
 "work". Anything more than the bare name goes to the normal rules, so calling
 a macro `notes` does not break `read me my notes`.
 
+### Two things in one sentence
+
+| Say | What happens |
+|---|---|
+| `open chrome and play some music` | both |
+| `take a screenshot then lock the laptop` | in that order |
+| `what's the weather and how's the battery` | reads you both answers |
+| `chrome band karo and spotify kholo` | works in Hindi too |
+
+**What it will not do is the interesting half.** Splitting a sentence that was
+never two sentences runs something you never asked for, so it refuses far more
+often than it splits:
+
+| Say | Why it stays one command |
+|---|---|
+| `remind me to call mum and dad` | one reminder — "dad" is part of it |
+| `add milk and eggs to my list` | one item |
+| `google cats and dogs` | one search |
+| `what is the difference between ram and storage` | one question |
+| `message ravi saying running late and sorry` | one message |
+
+The rule underneath: **never split after a command that takes dictated
+words.** If the first half is a note, a reminder, a search, a message or
+something to type, then whatever follows the "and" probably belongs to it. If
+the first half is `open chrome` — which swallows nothing — the "and" is a
+join. Every part also has to work as a command on its own, so
+`open chrome and then what` stays whole.
+
+If it refuses a split you wanted, say **`then`** instead of `and`. And if a
+step in the middle needs a yes, it is skipped and named rather than answered
+for you — same rule as macros.
+
 Forgotten what it does? Just say **`help`**.
 
 ---

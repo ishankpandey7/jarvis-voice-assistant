@@ -192,6 +192,58 @@ for phrase, want_media in [("resume it", True), ("resume", True),
     check(f"{phrase!r} -> {'media keys' if want_media else 'not the media keys'}",
           is_media == want_media, f"rule {index}: {rule_source(index)[:70]!r}")
 
+section("COMPOUND -- two commands in one sentence, and the many that are not")
+# The whole risk of this feature is in the second list. Splitting a sentence
+# that was never two sentences runs something you did not ask for; failing to
+# split just means you say the second half again. So the refusals matter more
+# than the splits, and there are deliberately more of them here.
+for phrase in [
+    "open chrome and play some music",
+    "open chrome then search for python tutorials",
+    "take a screenshot and lock the laptop",
+    "what's the weather and how's the battery",
+    "open chrome and open spotify",
+    "close chrome then open notion",
+    "brightness 30 and set volume to 20",
+    "chrome band karo and spotify kholo",
+    "what's the time and what's the date",
+    "mute and take a screenshot",
+    "start work then open notion",
+    "kitni jagah bachi hai and battery kitni hai",
+    "take a screenshot then lock the laptop and mute",
+]:
+    parts = brain.split_commands(brain.clean(phrase))
+    check(f"splits: {phrase!r}", len(parts) > 1, f"kept whole: {parts}")
+
+for phrase in [
+    # the "and" belongs to the words you dictated, not to Jarvis
+    "remind me to call mum and dad",
+    "add milk and eggs to my list",
+    "google cats and dogs",
+    "type hello and goodbye",
+    "message ravi saying running late and sorry",
+    "tell me about salt and pepper",
+    "find my resume and cover letter",
+    "play lofi and jazz on youtube",
+    "search for cats and dogs",
+    "remember robbie is ravi and shreyer is shreya",
+    "create a macro called x: open chrome and open spotify",
+    "note that the wifi password is swordfish and the guest one is guest",
+    "note likho milk and eggs lena hai",
+    "yaad dila dena doctor and dentist ko call karna",
+    # "storage" matches the disk rule on its own, but the first half is a
+    # question, and a question swallows what follows it
+    "what is the difference between ram and storage",
+    # half a sentence is not a command
+    "open chrome and then what",
+    "i had a rough day and i need to relax",
+    # nothing to split in the first place
+    "open chrome",
+    "how's the battery",
+]:
+    parts = brain.split_commands(brain.clean(phrase))
+    check(f"keeps whole: {phrase!r}", len(parts) == 1, f"SPLIT INTO {parts}")
+
 section("ROUTING -- macro commands do not collide with ordinary ones")
 for phrase, expect_macro_rule in [
     ("list my macros", True),

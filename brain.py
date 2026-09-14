@@ -759,6 +759,115 @@ def _reminder_text(text: str) -> str:
     return body or "Reminder"
 
 
+# ---------------------------------------------------------------------------
+# Compound commands: "open chrome and play some music" is two things.
+# ---------------------------------------------------------------------------
+#
+# Rules whose payload is words you dictated. A sentence that reaches one of
+# these must NEVER be split, because the "and" belongs to your sentence and
+# not to Jarvis: "remind me to call mum and dad" is one reminder, "add milk
+# and eggs to my list" is one item, "google cats and dogs" is one search.
+#
+# Worked out from what each rule CALLS, not written down as rule numbers.
+# Order in RULES is load-bearing, so any list of indices would rot the first
+# time somebody inserted a rule above.
+_SWALLOWS_FREE_TEXT = (
+    "memory.add_note", "memory.add_todo", "memory.add_reminder",
+    "memory.finish_todo", "memory.done_todo",
+    "keyboard.type_text", "keyboard.search_in_browser",
+    "names.teach", "macros.teach", "recipes.write_message",
+    "pc.clipboard_write", "knowledge.web_search", "knowledge.wiki",
+    "knowledge.youtube", "knowledge.maps", "knowledge.calculate",
+    "files.search", "files.search_by_type",
+    "_open_chat", "_find_in_app", "_play_music", "_todo_text", "_reminder_text",
+)
+
+_protected = None            # worked out once, on first use
+
+# Where one command can stop and the next begin. "then" is the safe word --
+# nobody says "milk then eggs". Bare "and" is the dangerous one, and it only
+# gets through because every part has to stand up on its own first.
+_JOIN = re.compile(r"\s*,\s*then\s+|\s+and then\s+|\s+after that\s+|"
+                   r"\s+then\s+|\s*;\s*|\s+and\s+", re.I)
+
+MAX_PARTS = 4
+
+
+def _rule_for(text: str):
+    """Which rule would catch this on its own? None if nothing would."""
+    for index, (pattern, _) in enumerate(RULES):
+        if re.search(pattern, text, re.I):
+            return index
+    return None
+
+
+def _is_protected(index: int) -> bool:
+    global _protected
+    if _protected is None:
+        import inspect
+        _protected = set()
+        for position, (_, action) in enumerate(RULES):
+            try:
+                body = inspect.getsource(action)
+            except (OSError, TypeError):           # built without source
+                continue
+            if any(name in body for name in _SWALLOWS_FREE_TEXT):
+                _protected.add(position)
+    return index in _protected
+
+
+def _stands_alone(part: str) -> bool:
+    """Would this work if you said only that, and nothing else?"""
+    part = part.strip()
+    if len(part) < 2:
+        return False
+    return bool(macros.resolve(part)) or _rule_for(part) is not None
+
+
+def split_commands(text: str) -> list:
+    """
+    "open chrome and play some music" -> two commands. Usually one.
+
+    Deliberately reluctant. Splitting a sentence that was never two
+    sentences is the worse mistake -- it runs something you did not ask
+    for -- while failing to split just means you say the second half
+    again. So it splits only when EVERY part would work as a command on
+    its own, and never when the whole sentence reached a rule that takes
+    dictated words.
+    """
+    parts = [p.strip(" .!?,") for p in _JOIN.split(text)]
+    parts = [p for p in parts if p]
+    if not 2 <= len(parts) <= MAX_PARTS:
+        return [text]
+
+    # Never split AFTER a command that takes dictated words, because the
+    # words after the "and" may well belong to it. Only the parts before a
+    # join matter: a free-text command in last place has nothing following
+    # it to swallow.
+    #
+    # Asking this per part, rather than of the whole sentence, is what makes
+    # it right. "open chrome and play some music" looks protected as a whole
+    # -- the music rule matches it -- but the join comes after "open chrome",
+    # which swallows nothing. Read the other way round, "remind me to call
+    # mum and dad" has the join sitting directly after a reminder, and dad
+    # is part of the reminder.
+    for part in parts[:-1]:
+        index = _rule_for(part)
+        if index is not None and _is_protected(index):
+            return [text]
+
+    return parts if all(_stands_alone(p) for p in parts) else [text]
+
+
+def _run_compound(parts: list) -> dict:
+    """Run the halves of a compound command, and answer as if it were one."""
+    out = macros.run_steps(parts)
+    if out["looped"]:
+        return {"speak": out["looped"], "results": out["rows"]}
+    return {"speak": macros.summarise(parts, out["spoken"], out["trouble"]),
+            "results": out["rows"]}
+
+
 def _play_music(text: str) -> str:
     """A song name means YouTube; otherwise just hit play/pause."""
     song = re.sub(r"\b(play|some|song|songs|music|track|something|me|a|an|the)\b",
@@ -835,6 +944,15 @@ def handle(raw_text: str, decorate: bool = True) -> dict:
     named = macros.resolve(text)
     if named:
         return _finish(_as_reply(macros.run(named)), decorate)
+
+    # Two commands in one sentence. This has to come before the rule list,
+    # because the rules would cheerfully match the first half and drop the
+    # rest on the floor without saying so -- which is what "it only did the
+    # first thing" was. split_commands() gives back one piece far more often
+    # than two; see how carefully it refuses.
+    pieces = split_commands(text)
+    if len(pieces) > 1:
+        return _finish(_as_reply(_run_compound(pieces)), decorate)
 
     for pattern, action in RULES:
         match = re.search(pattern, text, re.I)

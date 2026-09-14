@@ -31,8 +31,9 @@ Python server does the work on the machine, and it answers out loud.
 
 ```
 jarvis.py      stdlib http.server on 127.0.0.1:8765. Serves web/, takes commands.
-brain.py       ~100 regex rules, tried top to bottom, first match wins.
+brain.py       ~130 regex rules, tried top to bottom, first match wins.
                Specific rules above broad ones -- ORDER IS LOAD-BEARING.
+               Also splits compound commands before the rules are tried.
 ai.py          Optional second brain: local Ollama, or the Claude API.
 persona.py     Two personalities (Jarvis / Ultron) -- lines and voice settings.
 
@@ -44,12 +45,18 @@ skills/
   names.py     Learned corrections for names speech recognition mangles
   files.py     Search and tidy
   memory.py    Notes, to-dos, reminders, timers
+  macros.py    One name, several commands -- and the runner compound
+               commands share
   knowledge.py Weather (Open-Meteo), Wikipedia, search, arithmetic
   sysinfo.py   Battery, disk, focus mode
   winutil.py   PowerShell and key-press plumbing
 
 web/           index.html, style.css, app.js -- Web Speech API for ears and voice
-data/          notes, todos, reminders, names.json, recipes.json. Gitignored.
+data/          notes, todos, reminders, names.json, recipes.json,
+               macros.json. Gitignored.
+
+test_jarvis.py   161 checks. Run after any change.
+router_score.py  Scores the local model's action picking (96%).
 ```
 
 **Three levels of understanding**, tried in order:
@@ -174,8 +181,14 @@ are searched by their first four letters only. Still the weakest part.
 presses Down then Enter. If the first result is not the one I meant, it opens
 the wrong thing. No way to check without seeing the screen.
 
-**Compound commands do not work.** "Open chrome and search for X" is one
-sentence; the rules match one thing each. It usually only does the first half.
+~~**Compound commands do not work.**~~ Done — `brain.split_commands()`.
+"open chrome and play some music" runs both; so does `then`, and so does
+Hindi. The hard half was refusing: it will not split `remind me to call mum
+and dad`, `add milk and eggs to my list` or `google cats and dogs`. The rule
+is **never split after a command that takes dictated words** — if the first
+half is a note, reminder, search, message or something to type, the words
+after the "and" probably belong to it. 32 cases in `test_jarvis.py`, and
+deliberately more refusals than splits.
 
 ~~**No macros.**~~ Done — `skills/macros.py`. Say `start work` and it opens
 VS Code, Chrome and Spotify. Steps are just things you would say, so a macro
@@ -256,18 +269,16 @@ Set `ai.BACKEND = "off"` to test the rules alone.
 
 Roughly in the order I care about:
 
-1. **Compound commands** — "open chrome and search for X" in one sentence.
-   Most of the machinery is already there: `macros.run()` executes a list of
-   spoken commands one after another, so this is mostly the splitting, which
-   is the risky half — "remind me to call mum and dad" must not become two
-   steps. `macros._BETWEEN` is the splitter to start from.
-2. **More apps and shortcuts** — keep growing `recipes.py` and `desktop.py`.
-3. **Offline speech-to-text** — would drop Chrome and Google entirely, work in
+1. **More apps and shortcuts** — keep growing `recipes.py` and `desktop.py`.
+   Also worth doing, and cheap: run `router_score.py`, find a **SAVED** line
+   you say often, and make it a rule. That loop is how the Hindi commands
+   and half the recent work happened.
+2. **Offline speech-to-text** — would drop Chrome and Google entirely, work in
    any browser, let the microphone be chosen in code (the Web Speech API never
    allows that), and keep my voice on the machine. `faster-whisper` is the
    route and **`ctranslate2` does have a `cp314` wheel — I checked.** An
    earlier attempt is in the git history; it was removed as dead code.
-4. **Screen awareness** — the real unlock, and much harder.
+3. **Screen awareness** — the real unlock, and much harder.
 
 ---
 

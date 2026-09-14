@@ -173,34 +173,33 @@ def preview(name: str, limit: int = 6) -> str:
 _RUNNING = set()
 
 
-def run(name: str) -> dict:
-    """Run every step in a macro, then report what actually happened."""
+def run_steps(steps: list, pause: float = DEFAULT_PAUSE, guard: str = "") -> dict:
+    """
+    Say a list of commands, one after another, and report what happened.
+
+    Shared by two callers, because they are the same job underneath: a
+    macro is a list of things to say, and so is "open chrome and play
+    music" once it has been split. Everything that makes running a list
+    safe -- never answering a confirmation, catching loops, pausing so
+    windows do not fight over focus -- should only exist once.
+
+    `guard` is a name to hold in _RUNNING while this runs, so a macro
+    cannot reach itself. Compound commands pass nothing: they are typed
+    fresh each time and cannot recurse.
+
+    Gives back the raw pieces rather than a sentence, because the two
+    callers word the result differently.
+    """
     import brain                                   # late: brain imports us
 
-    plan = table().get(name)
-    if plan is None:
-        return {"speak": f"I have no macro called {name}.", "failed": True}
-
-    if name in _RUNNING:
-        # Deliberately not "failed": that word means "a rule grabbed a
-        # sentence it should not have, let the AI try instead", and asking
-        # a language model about a loop in your own config helps nobody.
-        # "looped" travels back up and stops every macro in the chain.
-        return {"speak": f"The macro '{name}' ends up running itself, "
-                         f"so I stopped.", "looped": True}
-
-    steps = [s for s in plan.get("steps", []) if isinstance(s, str) and s.strip()]
-    if not steps:
-        return {"speak": f"The macro {name} has no steps in it.", "failed": True}
-
-    pause = _number(plan.get("pause"), DEFAULT_PAUSE)
     rows, spoken, trouble = [], [], []
 
-    _RUNNING.add(name)
+    if guard:
+        _RUNNING.add(guard)
     try:
         for position, step in enumerate(steps[:MAX_STEPS]):
-            # decorate=False: the personality belongs on the one answer the
-            # macro gives at the end, not on each step inside it.
+            # decorate=False: the personality belongs on the one answer
+            # given at the end, not on each step inside it.
             answer = brain.handle(step, decorate=False)
             said = (answer.get("speak") or "").strip()
 
@@ -209,10 +208,11 @@ def run(name: str) -> dict:
                 # already running. Carry the reason up unchanged rather
                 # than burying it under "1 of 3 went through".
                 rows.append({"name": step, "note": said})
-                return {"speak": said, "results": rows, "looped": True}
+                return {"rows": rows, "spoken": spoken, "trouble": trouble,
+                        "looped": said}
 
             if answer.get("needs_confirm"):
-                # Something in here wants a yes. Saying it for you is exactly
+                # Something here wants a yes. Saying it for you is exactly
                 # the thing this must never do -- so drop the question brain
                 # is now holding, skip the step, and name it in the report.
                 brain.clear_pending()
@@ -229,22 +229,50 @@ def run(name: str) -> dict:
             if position < len(steps) - 1:
                 time.sleep(pause)
     finally:
-        _RUNNING.discard(name)                     # even if a step threw
+        if guard:
+            _RUNNING.discard(guard)                # even if a step threw
 
-    return {"speak": _report(name, plan, steps, spoken, trouble), "results": rows}
+    return {"rows": rows, "spoken": spoken, "trouble": trouble, "looped": ""}
 
 
-def _report(name, plan, steps, spoken, trouble) -> str:
+def run(name: str) -> dict:
+    """Run every step in a macro, then report what actually happened."""
+    plan = table().get(name)
+    if plan is None:
+        return {"speak": f"I have no macro called {name}.", "failed": True}
+
+    if name in _RUNNING:
+        # Deliberately not "failed": that word means "a rule grabbed a
+        # sentence it should not have, let the AI try instead", and asking
+        # a language model about a loop in your own config helps nobody.
+        # "looped" travels back up and stops every macro in the chain.
+        return {"speak": f"The macro '{name}' ends up running itself, "
+                         f"so I stopped.", "looped": True}
+
+    steps = [s for s in plan.get("steps", []) if isinstance(s, str) and s.strip()]
+    if not steps:
+        return {"speak": f"The macro {name} has no steps in it.", "failed": True}
+
+    out = run_steps(steps, _number(plan.get("pause"), DEFAULT_PAUSE), guard=name)
+    if out["looped"]:
+        return {"speak": out["looped"], "results": out["rows"], "looped": True}
+
+    return {"speak": _report(name, plan, steps, out["spoken"], out["trouble"]),
+            "results": out["rows"]}
+
+
+def summarise(steps, spoken, trouble, headline: str = "") -> str:
     """
-    What to say afterwards.
+    What to say after running a list -- for macros and compound commands.
 
-    A macro of questions should read you the answers; a macro that opens
-    things only needs to say it is done. The difference is whether the
-    macro gave itself a line to say.
+    With no headline of its own it reads the answers back, which is what
+    you want from a list of questions ("what's the weather and the
+    battery"). A macro that opens three apps gives itself a line instead,
+    because reading three "Opening X" back is noise.
     """
-    headline = (plan.get("say") or "").strip()
+    headline = (headline or "").strip()
     if not headline:
-        headline = " ".join(spoken) if spoken else f"Ran {name}."
+        headline = " ".join(spoken) if spoken else "Done."
 
     if not trouble:
         return headline
@@ -252,6 +280,12 @@ def _report(name, plan, steps, spoken, trouble) -> str:
     missed = "; ".join(trouble)
     worked = len(steps) - len(trouble)
     return f"{headline} {worked} of {len(steps)} went through -- I had trouble with: {missed}."
+
+
+def _report(name, plan, steps, spoken, trouble) -> str:
+    """A macro's own wording: its `say` line, or the answers it collected."""
+    return summarise(steps, spoken, trouble,
+                     headline=plan.get("say") or ("" if spoken else f"Ran {name}."))
 
 
 def _number(value, fallback: float) -> float:
