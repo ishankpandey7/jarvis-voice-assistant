@@ -37,7 +37,7 @@ Plain English, the way you would ask a person.
 ### Control the machine
 | Say | What happens |
 |---|---|
-| `open chrome` / `launch vs code` | opens it (it searches your Start Menu) |
+| `open chrome` / `open camera` / `launch vs code` | opens it — every app in your Start menu, Store apps included |
 | `close chrome` | quits it |
 | `take a screenshot` | saved to Pictures/Jarvis |
 | `set volume to 40` / `turn it up` / `mute` | sound |
@@ -315,8 +315,35 @@ gives you the deep robot; above 1.3 gets squeaky.
 
 ## If something goes wrong
 
-**"The microphone isn't working"** — open it in Chrome or Edge. Click the
-padlock in the address bar and set Microphone to Allow.
+**Speech is not working** — press **Mic check** in the header. Speech can fail
+in several unrelated ways and they need opposite fixes, so it tests each one
+separately and tells you which:
+
+| What it checks | What a failure means |
+|---|---|
+| Secure context | Open `http://127.0.0.1:8765`, not a network address |
+| Browser support | Firefox has none. Use Chrome or Edge |
+| Microphone | No device, or Chrome was never given permission |
+| **Which** microphone | See below — this one catches most people out |
+| Google's speech service | Your connection, not your microphone |
+
+There is also a live level bar: talk, and it should move. If the bar moves but
+speech still fails, the microphone is fine and the problem is the last row.
+
+**Two failures worth knowing about:**
+
+*Chrome is listening to your earbuds.* Chrome always uses whatever Windows has
+set as the default input, and a web page cannot override that. Bluetooth
+earbuds take that spot the moment they connect — so Chrome ends up listening to
+buds sitting in their case while you talk to the laptop, and hears silence with
+no error at all. Mic check names the device in use and lists the alternatives.
+To switch: right-click the speaker icon in the taskbar → Sound settings →
+Input → pick your laptop's Microphone Array, then reload the page.
+
+*Chrome's speech recognition runs on Google's servers.* It is not done on your
+machine, so a slow, metered or restricted connection breaks it even with a
+perfect microphone. This shows up as a `network` error, or as nothing happening
+at all. A different network usually fixes it; otherwise use the type box.
 
 **It hears you but picks the wrong thing** — try the local AI (above); it makes
 a real difference. Or type the command instead.
@@ -324,8 +351,12 @@ a real difference. Or type the command instead.
 **"Port 8765 is already in use"** — Jarvis is already running. Close the old
 window, or change `PORT` in `jarvis.py`.
 
-**An app won't open** — use the full name ("Google Chrome"), or add your own
-name to `APP_ALIASES` in `skills/pc.py`.
+**An app won't open** — Jarvis asks Windows for the whole Start menu
+(`Get-StartApps`), which covers ordinary programs *and* Store apps like Camera,
+Photos and Xbox. Those have no shortcut file anywhere on disk, so anything that
+searches the Start Menu folder misses them entirely — this does not. If a name
+still does not match, use the full one ("Google Chrome"), or add your own
+nickname to `APP_ALIASES` in `skills/pc.py`.
 
 **The volume percentage is slightly off** — Windows volume keys move in steps
 of 2%, so asking for 41 gets you 40. That is normal.

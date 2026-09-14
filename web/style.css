@@ -347,7 +347,61 @@ select:hover, .ghost:hover { border-color: var(--accent); }
   padding: 26px 28px;
   text-align: center;
 }
+.boot-box.wide {
+  max-width: 560px;
+  text-align: left;
+  max-height: 84vh;                  /* the whole box scrolls, not just a list */
+  overflow-y: auto;
+}
 .boot-box h2 { margin: 0 0 12px; font-size: 19px; }
+
+/* ---- mic check panel ---- */
+
+.level-wrap { margin: 18px 0 14px; }
+.level-bar {
+  height: 12px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.level-bar span {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--accent), var(--green));
+  transition: width 0.06s linear;
+}
+.level-note { margin-top: 7px; font-size: 12.5px; color: var(--dim); }
+
+.diag {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.diag li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text);
+}
+.diag .mark { flex: none; width: 18px; font-weight: 700; }
+.diag .pass .mark { color: var(--green); }
+.diag .fail .mark { color: var(--accent); }
+.diag .wait .mark { color: var(--dim); }
+.diag .detail { color: var(--dim); }
+
+.boot-actions {
+  display: flex;
+  gap: 9px;
+  justify-content: flex-end;
+  margin-top: 18px;
+}
 .boot-box p { margin: 0 0 10px; color: var(--dim); line-height: 1.6; font-size: 14px; }
 .boot-box .small { font-size: 13px; }
 .boot-box .ghost { margin-top: 8px; }

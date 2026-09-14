@@ -34,6 +34,7 @@
         <option value="en-GB">English (UK)</option>
       </select>
       <button id="muteBtn" class="ghost" title="Turn the spoken replies on or off">Voice on</button>
+      <button id="micCheckBtn" class="ghost" title="Find out why the microphone isn't working">Mic check</button>
     </div>
   </header>
 
@@ -71,6 +72,26 @@
     <p id="bootMsg"></p>
     <p class="small">You can type to Jarvis in the box at the bottom instead.</p>
     <button id="bootClose" class="ghost">Got it</button>
+  </div>
+</div>
+
+<div class="boot" id="micPanel" hidden>
+  <div class="boot-box wide">
+    <h2>Mic check</h2>
+    <p class="small">This works out whether the problem is your microphone or
+      Chrome's speech service — they fail in completely different ways.</p>
+
+    <div class="level-wrap">
+      <div class="level-bar"><span id="levelFill"></span></div>
+      <div class="level-note" id="levelNote">Speak now — the bar should move.</div>
+    </div>
+
+    <ol class="diag" id="diagList"></ol>
+
+    <div class="boot-actions">
+      <button id="micCheckRun" class="ghost">Run again</button>
+      <button id="micPanelClose" class="ghost">Close</button>
+    </div>
   </div>
 </div>
 
