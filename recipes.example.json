@@ -1,0 +1,53 @@
+{
+  "_comment": [
+    "Copy this to data/recipes.json to teach Jarvis new apps, or to add",
+    "shortcuts to ones it already knows. Your file is merged over the",
+    "built-in table in skills/recipes.py -- and your 'actions' are ADDED to",
+    "the built-in ones rather than replacing them, so adding one shortcut",
+    "does not cost you the rest.",
+    "",
+    "  search_key    the shortcut that opens the app's search box",
+    "  after_search  keys to press once the name is typed, to pick a result",
+    "  settle        seconds to wait for results before picking (slow apps: more)",
+    "  window_hint   part of the window title, if it differs from the app name",
+    "  actions       what you would SAY, mapped to the keys to press",
+    "",
+    "Key names: letters, digits, f1-f12, enter, tab, escape, space,",
+    "backspace, delete, up/down/left/right, home, end, pageup, pagedown,",
+    "comma, period, slash, semicolon, quote, backtick, minus, plus,",
+    "openbracket, closebracket, backslash. Combine with +.",
+    "",
+    "Restart Jarvis after editing. Ask 'what can you do in figma' to check."
+  ],
+
+  "figma": {
+    "search_key": "ctrl+p",
+    "after_search": ["enter"],
+    "settle": 0.6,
+    "actions": {
+      "layers": "alt+1",
+      "components": "alt+2",
+      "comment": "c",
+      "frame": "f",
+      "zoom to fit": "shift+1"
+    }
+  },
+
+  "steam": {
+    "search_key": "ctrl+f",
+    "after_search": ["enter"],
+    "settle": 0.8,
+    "actions": {
+      "library": "ctrl+2",
+      "friends": "ctrl+4",
+      "downloads": "ctrl+5"
+    }
+  },
+
+  "telegram": {
+    "actions": {
+      "archived": "ctrl+shift+a",
+      "saved messages": "ctrl+0"
+    }
+  }
+}

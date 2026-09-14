@@ -10,7 +10,7 @@ broad ones near the bottom.
 import re
 
 import persona
-from skills import files, keyboard, knowledge, memory, pc, sysinfo
+from skills import files, keyboard, knowledge, memory, pc, recipes, sysinfo
 
 # When Jarvis asks a question ("shall I?"), the answer waits here.
 _pending = {"action": None}
@@ -76,7 +76,9 @@ RULES = [
     (r"^(hi|hello|hey|yo|good (morning|evening|afternoon)|how are you|"
      r"what's up|whats up|are you there|you there)\b",
      lambda m, t: _voice(persona.greeting())),
-    (r"\b(help|what can you do|what can i say|commands|show commands)\b",
+    # The lookahead keeps "what can you do in telegram" out of general help
+    # and lets it reach the per-app answer further down.
+    (r"\b(help|what can you do|what can i say|commands|show commands)\b(?!\s+in\b)",
      lambda m, t: HELP_TEXT),
     (r"\b(thanks|thank you|cheers|appreciate it)\b",
      lambda m, t: _voice(persona.thanks())),
@@ -151,6 +153,35 @@ RULES = [
      r"\b(find|search|show|list|where)\b|"
      r"\b(find|locate|where'?s?|where is)\s+(my|the)\b",
      lambda m, t: _find_files(t)),
+
+    # ---- Opening things INSIDE an app ------------------------------------
+    # These sit above the generic keyboard rules because they are more
+    # specific: "open the chat with ravi" must not become "open an app
+    # called ravi".
+    (r"\b(message|text|dm|write to|send)\b.+\b(saying|that|:)\b",
+     lambda m, t: _message(t)),
+    (r"\b(open|find|go to|show)\b.*\b(chat|conversation|dm|thread)\b|"
+     r"\b(chat|conversation|dm)\b.*\b(with|of|from)\b",
+     lambda m, t: _open_chat(t)),
+    (r"\b(find|search|look for|open)\b.+\bin (telegram|whatsapp|discord|slack|"
+     r"teams|outlook|spotify|obsidian|vs ?code|visual studio code|explorer)\b",
+     lambda m, t: _find_inside(t)),
+    (r"^\s*send\s*(it|that|the message)?\s*$",
+     lambda m, t: recipes.send_typed_message()),
+    # Asking ABOUT an app comes before acting IN one, or "what can you do in
+    # telegram" is read as a command to perform inside Telegram.
+    (r"\bwhich apps can you\b.*\b(search|work|help) (in|inside|with)\b|"
+     r"\bwhat apps do you know\b",
+     lambda m, t: "I know my way around " + ", ".join(recipes.known_apps())
+                  + ". Any other app gets a generic Ctrl+F search."),
+    (r"\bwhat can (you|i) do in ([a-z ]+?)\s*$",
+     lambda m, t: f"In {m.group(2).strip()} I know: "
+                  + ", ".join(sorted(recipes.actions_for(m.group(2).strip()))[:14])
+                  + "."),
+    # "new chat in telegram", "command palette in vs code", "bookmark in chrome"
+    (r"\bin (telegram|whatsapp|discord|slack|teams|outlook|chrome|edge|spotify|"
+     r"obsidian|notepad|explorer|vs ?code|visual studio code)\s*$",
+     lambda m, t: _do_inside(t, m.group(1))),
 
     # ---- Working inside whatever app is open -----------------------------
     # Opening a program was only half the job; these do things once it is
@@ -435,6 +466,60 @@ def _strip_fillers(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip(" .!?,")
 
 
+CHAT_APPS = ("telegram", "whatsapp", "discord", "slack", "teams", "outlook",
+             "messenger", "signal", "instagram")
+
+
+def _which_app(text: str, fallback: str = "telegram") -> str:
+    """Which app was named? Falls back to the usual one for chatting."""
+    low = text.lower()
+    for app in list(CHAT_APPS) + recipes.known_apps():
+        if app in low:
+            return app
+    return fallback
+
+
+def _open_chat(text: str) -> dict:
+    """'open the chat with ravi in telegram' -> find "ravi" inside Telegram."""
+    app = _which_app(text)
+    who = re.sub(r"\b(open|find|go to|show me|show|the|a|my|chat|conversation|"
+                 r"dm|thread|with|of|from|in|on|please)\b", " ", text, flags=re.I)
+    who = re.sub(rf"\b{app}\b", " ", who, flags=re.I)
+    who = re.sub(r"\s+", " ", who).strip(" .!?,")
+    if not who:
+        return {"speak": f"Whose chat should I open in {app}?", "failed": True}
+    return recipes.find_in_app(app, who)
+
+
+def _do_inside(text: str, app: str) -> dict:
+    """'new chat in telegram' -> press Telegram's own new-chat shortcut."""
+    what = _before(text, r"\bin\s+" + re.escape(app) + r"\s*$")
+    what = re.sub(r"^\s*(do|the|a|open|press|hit)\b", " ", what, flags=re.I)
+    return recipes.do_in_app(app, re.sub(r"\s+", " ", what).strip(" .!?,"))
+
+
+def _find_inside(text: str) -> dict:
+    """'find the budget file in obsidian' -> search inside that app."""
+    match = re.search(r"\bin\s+([a-z ]+?)\s*$", text, re.I)
+    app = match.group(1).strip() if match else _which_app(text)
+    what = _before(text, r"\bin\s+[a-z ]+?\s*$") if match else text
+    what = re.sub(r"^\s*(find|search for|search|look for|open)\b", " ", what, flags=re.I)
+    what = re.sub(r"\b(the|a|my)\b", " ", what, flags=re.I)
+    return recipes.find_in_app(app, re.sub(r"\s+", " ", what).strip(" .!?,"))
+
+
+def _message(text: str) -> dict:
+    """'message ravi on telegram saying I am late' -> type it, do not send."""
+    app = _which_app(text)
+    body = _after(text, r"\b(saying|that|:)\b")
+    head = _before(text, r"\b(saying|that|:)\b")
+    who = re.sub(r"\b(message|text|dm|write to|send (a )?(message|text)?( to)?|"
+                 r"on|in|to|the|a|my|please)\b", " ", head, flags=re.I)
+    who = re.sub(rf"\b{app}\b", " ", who, flags=re.I)
+    who = re.sub(r"\s+", " ", who).strip(" .!?,")
+    return recipes.write_message(app, who, body)
+
+
 def _typed_text(text: str) -> str:
     """'type hello world' -> 'hello world', quotes stripped if they used any."""
     body = _after(text, r"\b(type|write|enter)\b\s*(out)?\s*(:)?")
@@ -492,6 +577,8 @@ def handle(raw_text: str) -> dict:
         if YES.match(text):
             if waiting["skill"] == "files.organize":
                 return _finish(_as_reply(files.organize(waiting["folder"], do_it=True)))
+            if waiting["skill"] == "recipes.send":
+                return _finish(_as_reply(recipes.send_typed_message()))
             if waiting["skill"] == "ai.run":
                 return _finish(_as_reply(
                     ai.run_confirmed(waiting["action"], waiting["target"])))

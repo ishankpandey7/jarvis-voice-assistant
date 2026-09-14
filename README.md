@@ -46,9 +46,37 @@ Plain English, the way you would ask a person.
 | `focus mode` | closes WhatsApp, Discord, Steam and friends |
 | `next track` / `pause the music` | media keys |
 
-### Work inside the app that's open
-Opening a program is only half of it. Jarvis drives the real keyboard, so
-these go to whatever window is in front.
+### Work inside a specific app
+Jarvis knows its way around a handful of apps — which key opens their search,
+and what their own shortcuts are.
+
+| Say | What happens |
+|---|---|
+| `open the chat with ravi in telegram` | brings Telegram up, searches, opens that chat |
+| `message ravi on telegram saying I'm late` | opens the chat and **types** it — see below |
+| `find budget in obsidian` | opens that note |
+| `new chat in telegram` / `command palette in vs code` | that app's own shortcut |
+| `incognito in chrome` / `terminal in vs code` | same |
+| `what can you do in telegram` | lists what it knows for that app |
+| `which apps can you work in` | the whole list |
+
+Built in: Telegram, WhatsApp, Discord, Slack, Teams, Outlook, Chrome, Edge,
+VS Code, Obsidian, Spotify, Notepad, File Explorer. Anything else falls back to
+a generic Ctrl+F search, which is right more often than you would expect.
+
+> **It never sends a message.** `message ravi saying I'm late` opens the chat
+> and types the words, then stops:
+> *Typed "I'm late" to ravi in telegram. Check it is the right person, then say
+> send.* The contact was matched by a fuzzy search and there is no unsending a
+> message to the wrong person, so the last key is always yours. Say `send`.
+
+**Teaching it a new app** — copy `recipes.example.json` to `data/recipes.json`
+and edit. Your entries merge over the built-ins, and your `actions` are added
+to theirs rather than replacing them. No code, and a restart picks it up.
+
+### Work inside whatever app is in front
+Jarvis drives the real keyboard, so these go to the focused window whatever
+it is.
 
 | Say | What happens |
 |---|---|
@@ -301,7 +329,8 @@ ai.py              The optional extra brain -- Ollama and Claude.
 
 skills/
   pc.py            Apps, volume, brightness, screenshots, lock, clipboard
-  keyboard.py      Typing, key combos, switching windows -- working inside apps
+  keyboard.py      Typing, key combos, switching windows
+  recipes.py       What each app's own shortcuts are -- the table to edit
   files.py         Searching and tidying
   memory.py        Notes, to-dos, reminders, timers
   knowledge.py     Weather (Open-Meteo), Wikipedia, search, arithmetic
@@ -378,6 +407,13 @@ name is needed.
 
 **"Port 8765 is already in use"** — Jarvis is already running. Close the old
 window, or change `PORT` in `jarvis.py`.
+
+**It opens the app again instead of doing the thing inside it** — this was a
+real bug and it is fixed, but the cause is worth knowing. Telegram, Discord and
+WhatsApp hide in the notification area rather than closing, so the process runs
+with no window at all. Asking to focus one fails, and relaunching is what
+restores it — which looked like "it just opens Telegram again". Jarvis now
+relaunches, waits for the window to actually appear, and only then types.
 
 **An app won't open** — Jarvis asks Windows for the whole Start menu
 (`Get-StartApps`), which covers ordinary programs *and* Store apps like Camera,
