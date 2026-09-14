@@ -394,7 +394,8 @@ select:hover, .ghost:hover { border-color: var(--accent); }
 .diag .pass .mark { color: var(--green); }
 .diag .fail .mark { color: var(--accent); }
 .diag .wait .mark { color: var(--dim); }
-.diag .detail { color: var(--dim); }
+/* pre-line so a blank line inside a detail message survives */
+.diag .detail { color: var(--dim); white-space: pre-line; }
 
 .boot-actions {
   display: flex;
@@ -450,4 +451,12 @@ body.ultron .boot { background: rgba(13, 6, 8, 0.93); }
 body.ultron .brand { letter-spacing: 5px; }
 body.ultron .orb.thinking .core {
   background: radial-gradient(circle at 35% 30%, #fecaca, #dc2626 60%, #7f1d1d);
+}
+
+/* Heard in wake mode but without the wake word -- shown faded so it is
+   obvious Jarvis IS listening and is simply waiting to be addressed.
+   Silence here looks identical to a broken microphone. */
+.heard.ignored {
+  opacity: 0.42;
+  font-style: italic;
 }

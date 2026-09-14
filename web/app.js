@@ -26,6 +26,7 @@ let wakeMode = false;       // always-listening mode
 let busy = false;           // waiting on the server
 let speakOut = true;        // speak replies, or only show them
 let stoppedByUs = false;    // did we stop it, or did it stop on its own
+let ignoreTimer = null;     // clears the "say my name first" hint
 
 // Overwritten by the server with the active personality's settings.
 let voiceConfig = { pitch: 1.0, rate: 1.03, prefer: ["en-IN"] };
@@ -258,7 +259,15 @@ function buildRecognition() {
   engine.interimResults = true;
   engine.maxAlternatives = 1;
 
-  engine.onstart = () => { listening = true; setState("listening"); };
+  engine.onstart = () => {
+    clearTimeout(startWatchdog);
+    listening = true;
+    setState("listening");
+    console.log("[jarvis] listening…");
+  };
+
+  engine.onaudiostart = () => console.log("[jarvis] audio in");
+  engine.onspeechstart = () => console.log("[jarvis] speech detected");
 
   engine.onresult = (event) => {
     let finalText = "", interim = "";
@@ -277,8 +286,23 @@ function buildRecognition() {
     // Wake mode: only act when the name was said.
     const lower = spoken.toLowerCase();
     const hit = WAKE_WORDS.find((word) => lower.includes(word));
-    if (!hit) { heard.textContent = ""; return; }
 
+    if (!hit) {
+      // It heard you perfectly and is ignoring you on purpose. Say so --
+      // silence here looks exactly like a broken microphone.
+      heard.textContent = '"' + spoken + '"';
+      heard.classList.add("ignored");
+      hint.textContent = `Say "${brandName.textContent}" first, then the command`;
+      clearTimeout(ignoreTimer);
+      ignoreTimer = setTimeout(() => {
+        heard.classList.remove("ignored");
+        heard.textContent = "";
+        setState(listening ? "listening" : "idle");
+      }, 2600);
+      return;
+    }
+
+    heard.classList.remove("ignored");
     const command = spoken.slice(lower.indexOf(hit) + hit.length).trim();
     if (command.length > 1) send(command);
     else { heard.textContent = ""; say("Yes?"); }
@@ -344,6 +368,8 @@ function buildRecognition() {
   return engine;
 }
 
+let startWatchdog = null;
+
 function startListening() {
   if (listening || busy) return;
   stoppedByUs = false;
@@ -352,8 +378,32 @@ function startListening() {
     showMicProblem("This browser has no speech support. Open Jarvis in Chrome or Edge.");
     return;
   }
-  try { recognition.start(); }
-  catch (err) { /* already running, nothing to do */ }
+
+  try {
+    recognition.start();
+  } catch (err) {
+    // This used to be swallowed, which meant a failed start looked exactly
+    // like nothing happening at all.
+    console.error("[jarvis] recognition.start() failed:", err);
+    if (!/already started/i.test(err.message || "")) {
+      showMicProblem("Could not start listening: " + err.message);
+    }
+    return;
+  }
+
+  // If onstart never arrives, recognition died before it began -- silently,
+  // which is the single most confusing way for this to fail.
+  clearTimeout(startWatchdog);
+  startWatchdog = setTimeout(() => {
+    if (!listening && !busy) {
+      console.warn("[jarvis] recognition never started");
+      showMicProblem(
+        "Listening never started, and the browser gave no reason. Press "
+        + "“Mic check” in the header — it tests each part separately and "
+        + "says which one is broken.");
+      setState("idle");
+    }
+  }, 3000);
 }
 
 function stopListening() {
@@ -473,6 +523,15 @@ document.onkeydown = (event) => {
 const diagList = $("diagList");
 let micStream = null, micRaf = null;
 
+// Everything the check finds gets collected here and posted to the server,
+// which writes it to data/mic-report.json. Reading a file beats trying to
+// describe a panel of ticks and crosses over chat.
+let report = [];
+
+function note(what, value) {
+  report.push({ check: what, result: value });
+}
+
 function diag(text, state, detail) {
   const item = document.createElement("li");
   item.className = state;
@@ -505,6 +564,89 @@ function updateDiag(item, text, state, detail) {
   }
 }
 
+async function saveReport() {
+  try {
+    await post("/api/diag", { report });
+    let line = document.getElementById("savedNote");
+    if (!line) {                                   // one line, not one per run
+      line = document.createElement("div");
+      line.id = "savedNote";
+      line.className = "level-note";
+      diagList.parentNode.insertBefore(line, diagList.nextSibling);
+    }
+    line.textContent = "Report saved to data/mic-report.json.";
+  } catch (err) {
+    console.warn("[jarvis] could not save the report:", err);
+  }
+}
+
+
+/*
+ * Test every microphone in turn.
+ *
+ * A page cannot tell speech recognition which device to use -- it always
+ * takes Chrome's choice. But it CAN open any device directly and measure
+ * it. So when the selected microphone turns out to be silent, this says
+ * whether ANY of them is picking up sound, which splits "wrong device
+ * chosen" from "the whole audio input is muted somewhere".
+ */
+async function testEachDevice() {
+  const list = (await navigator.mediaDevices.enumerateDevices())
+    .filter((d) => d.kind === "audioinput" && d.deviceId !== "communications");
+
+  const results = [];
+  for (const device of list) {
+    $("levelNote").textContent =
+      `Keep talking — testing ${shortName(device.label)}…`;
+    const peak = await measure(device.deviceId, 2600);
+    results.push({ label: device.label || device.deviceId, peak });
+  }
+  $("levelNote").textContent = "Done.";
+  return results;
+}
+
+function shortName(label) {
+  return (label || "unknown").replace(/\s*\(.*$/, "").slice(0, 34);
+}
+
+/** Open one device and return the loudest thing heard, 0 to 100. */
+function measure(deviceId, milliseconds) {
+  return new Promise(async (resolve) => {
+    let stream = null, audio = null;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: { deviceId: { exact: deviceId } },
+      });
+      audio = new AudioContext();
+      const analyser = audio.createAnalyser();
+      analyser.fftSize = 512;
+      audio.createMediaStreamSource(stream).connect(analyser);
+      const data = new Uint8Array(analyser.frequencyBinCount);
+
+      let peak = 0;
+      const until = Date.now() + milliseconds;
+      const tick = () => {
+        analyser.getByteTimeDomainData(data);
+        let loudest = 0;
+        for (const v of data) loudest = Math.max(loudest, Math.abs(v - 128));
+        peak = Math.max(peak, Math.min(100, (loudest / 40) * 100));
+        $("levelFill").style.width = Math.min(100, (loudest / 40) * 100) + "%";
+
+        if (Date.now() < until) return requestAnimationFrame(tick);
+        stream.getTracks().forEach((t) => t.stop());
+        audio.close();
+        $("levelFill").style.width = "0%";
+        resolve(Math.round(peak));
+      };
+      tick();
+    } catch (err) {
+      if (stream) stream.getTracks().forEach((t) => t.stop());
+      if (audio) audio.close();
+      resolve(-1);                                 // could not open it at all
+    }
+  });
+}
+
 function stopMeter() {
   if (micRaf) cancelAnimationFrame(micRaf);
   micRaf = null;
@@ -518,8 +660,15 @@ async function runMicCheck() {
   diagList.innerHTML = "";
   $("levelNote").textContent = "Speak now — the bar should move.";
 
+  report = [];
+  note("when", new Date().toString());
+  note("url", location.href);
+  note("userAgent", navigator.userAgent);
+  note("accent setting", langSelect.value);
+
   // 1. Is this a context the speech API is even allowed in?
   const secure = window.isSecureContext;
+  note("secure context", secure);
   diag(secure ? "Page is a secure context" : "Page is NOT a secure context",
        secure ? "pass" : "fail",
        secure ? location.origin
@@ -528,6 +677,7 @@ async function runMicCheck() {
 
   // 2. Does this browser have the speech API at all?
   const hasSpeech = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+  note("SpeechRecognition present", hasSpeech);
   diag(hasSpeech ? "Browser supports speech recognition"
                  : "This browser has no speech recognition",
        hasSpeech ? "pass" : "fail",
@@ -541,9 +691,11 @@ async function runMicCheck() {
     micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     micOk = true;
     const label = micStream.getAudioTracks()[0]?.label || "default device";
+    note("microphone", "ok: " + label);
     updateDiag(micItem, "Microphone works", "pass", label);
     startMeter(micStream);
   } catch (err) {
+    note("microphone", "FAILED " + err.name + ": " + err.message);
     updateDiag(micItem, "Microphone not available", "fail",
       err.name === "NotAllowedError"
         ? "Chrome has not been given permission. Click the padlock by the "
@@ -565,6 +717,8 @@ async function runMicCheck() {
                                         && d.deviceId !== "communications");
       const inUse = micStream.getAudioTracks()[0]?.label || "";
       const others = inputs.filter((d) => d.label && d.label !== inUse);
+      note("recording from", inUse);
+      note("other inputs", others.map((d) => d.label));
 
       if (others.length) {
         const suspect = /headset|hands-?free|bluetooth|buds|airpods|earphone/i.test(inUse);
@@ -585,7 +739,56 @@ async function runMicCheck() {
     }
   }
 
-  if (!hasSpeech || !micOk) return;
+  // 3c. Try every microphone, one at a time. This is the only way to tell
+  // "Chrome picked the wrong one" apart from "they are all muted".
+  if (micOk) {
+    stopMeter();                                   // free the device first
+    const perDevice = diag("Testing each microphone — keep talking…", "wait");
+    let levels = [];
+    try {
+      levels = await testEachDevice();
+    } catch (err) {
+      console.warn("[jarvis] per-device test failed:", err);
+    }
+    note("per-device levels", levels);
+
+    const heard = levels.filter((r) => r.peak > 8);
+    const summary = levels
+      .map((r) => `${shortName(r.label)}: ${r.peak < 0 ? "could not open"
+                                                       : r.peak + "%"}`)
+      .join("\n");
+
+    if (!levels.length) {
+      updateDiag(perDevice, "No microphones to test", "fail");
+    } else if (heard.length) {
+      updateDiag(perDevice, `Sound reached ${heard.length} of ${levels.length} microphones`,
+        "pass",
+        summary + "\n\nThe working one is "
+        + shortName(heard[0].label)
+        + ". Chrome must be pointed at it: click the icon at the far left of "
+        + "the address bar → Site settings → Microphone → pick it → reload.");
+    } else {
+      updateDiag(perDevice, "Every microphone is silent", "fail",
+        summary
+        + "\n\nNot one of them picked up any sound, so this is not about "
+        + "which device is chosen — the input is muted somewhere outside the "
+        + "browser. Three things to check:\n"
+        + "1. The mic-mute key on your keyboard (F4 on a Lenovo LOQ, it has "
+        + "a small microphone symbol and a light when muted).\n"
+        + "2. Windows: right-click the speaker icon → Sound settings → Input "
+        + "→ click the device → check its volume is up and it is not muted.\n"
+        + "3. Nahimic: it can mute or gate the microphone on its own. Open it "
+        + "and turn off any microphone effects.");
+    }
+  }
+
+  // If we cannot get as far as the speech test, save what we have -- a
+  // report that stops early still says where it stopped.
+  if (!hasSpeech || !micOk) {
+    note("speech service", "not tested, an earlier check failed");
+    saveReport();
+    return;
+  }
 
   // 4. The speech service. This is the one that fails on a bad connection.
   const speechItem = diag("Testing Chrome's speech service (say anything)…", "wait");
@@ -595,13 +798,26 @@ async function runMicCheck() {
   test.interimResults = true;
   test.continuous = false;
 
+  const events = [];
+  const at = Date.now();
+  const mark = (name, extra) => {
+    events.push(`+${((Date.now() - at) / 1000).toFixed(1)}s ${name}`
+                + (extra ? " " + extra : ""));
+  };
+  ["audiostart", "soundstart", "speechstart", "speechend", "soundend", "audioend"]
+    .forEach((name) => { test["on" + name] = () => mark(name); });
+  test.onstart = () => mark("start");
+
   let heardSomething = false;
   let settled = false;
   const settle = (text, state, detail) => {
     if (settled) return;
     settled = true;
+    note("speech service", text);
+    note("speech events", events);
     updateDiag(speechItem, text, state, detail);
     try { test.abort(); } catch (e) {}
+    saveReport();
   };
 
   test.onresult = (event) => {
@@ -611,6 +827,7 @@ async function runMicCheck() {
   };
 
   test.onerror = (event) => {
+    mark("error", event.error);
     if (event.error === "no-speech") {
       settle("Speech service reached, but heard nothing", "wait",
         "The connection is fine. Say something louder and run this again.");
@@ -626,12 +843,44 @@ async function runMicCheck() {
   };
 
   test.onend = () => {
-    if (!heardSomething) {
-      settle("Speech service did not return anything", "fail",
-        "No result and no error. This is almost always a blocked connection "
-        + "to Google's speech servers.");
-    }
+    mark("end");
+    if (!heardSomething) { const v = verdict(); settle(v[0], v[1], v[2]); }
   };
+
+  /*
+   * Which failure was it? The event sequence says, and the two look nothing
+   * alike once you know what to watch for:
+   *
+   *   start, audiostart, (nothing)   the stream opened and carried silence.
+   *                                  The wrong microphone is selected.
+   *   start, audiostart, soundstart  sound arrived, so the microphone is
+   *                                  fine and the recogniser is the problem.
+   */
+  function verdict() {
+    const sawSound = events.some((e) => /soundstart|speechstart/.test(e));
+
+    if (!sawSound) {
+      return ["That microphone is sending silence", "fail",
+        "The stream opened but no sound ever arrived — not even background "
+        + "noise. The microphone is not the one you are speaking into.\n\n"
+        + "Chrome keeps its own microphone choice per site and ignores the "
+        + "Windows default, which is why changing Windows settings does not "
+        + "help. Click the icon at the far left of the address bar → Site "
+        + "settings → Microphone, pick "
+        + (pickLaptopMic() || "your laptop's microphone")
+        + ", then reload this page."];
+    }
+    return ["Sound arrived, but no words came back", "fail",
+      "The microphone is working. Chrome sends the audio to Google's servers "
+      + "to turn into text, and that part did not answer. Usually a slow or "
+      + "restricted connection. Try another network, or type instead."];
+  }
+
+  function pickLaptopMic() {
+    const entry = report.find((r) => r.check === "other inputs");
+    const list = (entry && entry.result) || [];
+    return list.find((n) => /array|realtek|internal|built-?in/i.test(n)) || list[0];
+  }
 
   try {
     test.start();
@@ -639,9 +888,7 @@ async function runMicCheck() {
     settle("Could not start speech recognition", "fail", err.message);
   }
   setTimeout(() => {
-    if (!settled) settle("Speech service timed out after 8 seconds", "fail",
-      "Chrome never answered. That points at the connection to Google's "
-      + "speech servers, not at your microphone.");
+    if (!settled) { const v = verdict(); settle(v[0], v[1], v[2]); }
   }, 8000);
 }
 

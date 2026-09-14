@@ -23,7 +23,7 @@ import time
 import urllib.request
 from pathlib import Path
 
-from skills import files, knowledge, memory, pc, sysinfo
+from skills import files, keyboard, knowledge, memory, pc, sysinfo
 
 HERE = Path(__file__).resolve().parent
 ENV_FILE = HERE / ".env"
@@ -83,6 +83,10 @@ ACTIONS = {
     "disk": lambda arg: sysinfo.disk(),
     "running_apps": lambda arg: sysinfo.running_apps(),
     "focus_mode": lambda arg: sysinfo.focus_mode(),
+    "type_text": lambda arg: keyboard.type_text(arg),
+    "search_in_browser": lambda arg: keyboard.search_in_browser(arg),
+    "focus_window": lambda arg: keyboard.focus_window(arg),
+    "press_key": lambda arg: keyboard.press(arg),
 }
 
 ACTION_NAMES = sorted(ACTIONS) + ["answer"]
@@ -109,6 +113,10 @@ Output ONLY the action and its target. Never answer the question yourself.
   youtube      play or search a video. target = the query
   wikipedia    facts about a person, place or thing. target = the topic
   battery / disk / running_apps / focus_mode      target = ""
+  type_text    type words into the window that is open. target = the words
+  search_in_browser  search the web in the open browser. target = the query
+  focus_window bring a program's window to the front. target = its name
+  press_key    press a key or combo. target = e.g. "enter", "ctrl+t", "pagedown"
   answer       a general question or chit-chat needing no action. target = ""
 
 Pick "answer" only when no action above fits. Never guess a target you were
@@ -334,6 +342,10 @@ NEEDS_CONFIRM = {
     "lock": "Lock the laptop?",
     "close_app": "Close {target}?",
     "focus_mode": "Close WhatsApp, Discord, Telegram, Steam and Spotify?",
+    # Typing goes into whatever window is in front, so a wrong guess lands
+    # characters in the middle of someone's work. The question names the
+    # window on purpose -- that is the part you need to see before saying yes.
+    "type_text": "Type “{target}” into {window}?",
 }
 
 
@@ -342,7 +354,9 @@ def _run(action: str, target: str, via: str) -> dict:
     import persona
 
     if action in NEEDS_CONFIRM:
-        question = NEEDS_CONFIRM[action].format(target=target or "that app")
+        question = NEEDS_CONFIRM[action].format(
+            target=target or "that app",
+            window=keyboard.active_window() or "the window in front")
         return {
             "speak": f"{question} Say yes if so.",
             "needs_confirm": True,

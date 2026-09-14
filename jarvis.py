@@ -186,6 +186,17 @@ class JarvisHandler(BaseHTTPRequestHandler):
             _log(f"  ~~ personality: {name}")
             self._send_json({"persona": name, "voice": persona.voice()})
 
+        elif route == "/api/diag":
+            # The mic check posts its findings here so they land in a file.
+            # Describing a diagnostic panel over chat loses details; a file
+            # does not.
+            report = json.dumps(data, indent=2, ensure_ascii=False)
+            path = Path(__file__).resolve().parent / "data" / "mic-report.json"
+            path.parent.mkdir(exist_ok=True)
+            path.write_text(report, encoding="utf-8")
+            _log(f"  ~~ mic report saved ({len(report)} bytes)")
+            self._send_json({"saved": True})
+
         elif route == "/api/open":
             self._send_json({"speak": files.open_file(data.get("path", ""))})
 

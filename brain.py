@@ -10,7 +10,7 @@ broad ones near the bottom.
 import re
 
 import persona
-from skills import files, knowledge, memory, pc, sysinfo
+from skills import files, keyboard, knowledge, memory, pc, sysinfo
 
 # When Jarvis asks a question ("shall I?"), the answer waits here.
 _pending = {"action": None}
@@ -140,10 +140,60 @@ RULES = [
      r"\bwhat('s| is) (taking|eating|using)\b.*\b(space|room)\b|"
      r"\bfree up space\b",
      lambda m, t: files.big_files()),
-    (r"\b(find|search for|look for|locate|where is|where are|where's)\b|"
-     r"\b(file|photo|document|pdf|excel|presentation)s?\b.*"
-     r"\b(find|search|show|list)\b",
+    # Searching FILES, not the web. It has to be clear which you meant, so
+    # this needs either a file-ish word or a possessive ("find my resume").
+    # Without that, "search for python tutorials" would go hunting through
+    # your Downloads folder instead of opening a browser.
+    (r"\b(find|locate|search for|look for|where is|where are|where's)\b.*"
+     r"\b(file|files|photo|photos|picture|document|documents|pdf|pdfs|folder|"
+     r"resume|cv|spreadsheet|presentation|song|video|download)s?\b|"
+     r"\b(file|photo|document|pdf|excel|presentation|folder)s?\b.*"
+     r"\b(find|search|show|list|where)\b|"
+     r"\b(find|locate|where'?s?|where is)\s+(my|the)\b",
      lambda m, t: _find_files(t)),
+
+    # ---- Working inside whatever app is open -----------------------------
+    # Opening a program was only half the job; these do things once it is
+    # on screen. They go before the broad open/close rules at the bottom.
+    # "find on page" is Ctrl+F, and must come before anything else that
+    # matches the word "find".
+    (r"\bfind (on|in) (the )?page\b|\bfind in\b|\bsearch (the |this )?page\b",
+     lambda m, t: keyboard.press("ctrl+f")),
+    # Searching the web. The file-search rule above already took anything
+    # that mentioned a file, so what reaches here is a real web search.
+    (r"\b(search|look up|google)\b",
+     lambda m, t: keyboard.search_in_browser(
+         _after(t, r"(?:search|look up|google)\s*(?:for|about|up)?"))),
+    (r"\b(type|write|enter)\b\s+(?!a note\b|this down\b)",
+     lambda m, t: keyboard.type_text(_typed_text(t))),
+    # Bare "focus" is not here on purpose: it would swallow both "focus mode"
+    # and the ordinary English "focus on the report".
+    (r"\b(switch to|bring up|bring me to|show me the) \w+",
+     lambda m, t: keyboard.focus_window(
+         _strip_fillers(_after(t, r"(switch to|bring up|bring me to|show me the)")))),
+    (r"\bnew tab\b", lambda m, t: keyboard.press("ctrl+t")),
+    (r"\bclose (the )?tab\b", lambda m, t: keyboard.press("ctrl+w")),
+    (r"\b(reopen|restore)( the)? tab\b", lambda m, t: keyboard.press("ctrl+shift+t")),
+    (r"\b(next|switch) tab\b", lambda m, t: keyboard.press("ctrl+tab")),
+    (r"\b(go back|back)\b(?!.*\bin a bit\b)", lambda m, t: keyboard.press("alt+left")),
+    (r"\bgo forward\b", lambda m, t: keyboard.press("alt+right")),
+    (r"\brefresh\b|\breload\b", lambda m, t: keyboard.press("f5")),
+    (r"\b(scroll|page) down\b", lambda m, t: keyboard.press("pagedown")),
+    (r"\b(scroll|page) up\b", lambda m, t: keyboard.press("pageup")),
+    (r"\bselect all\b", lambda m, t: keyboard.press("ctrl+a")),
+    (r"\b(copy that|copy it)\b", lambda m, t: keyboard.press("ctrl+c")),
+    (r"\bpaste\b", lambda m, t: keyboard.press("ctrl+v")),
+    (r"\bundo\b", lambda m, t: keyboard.press("ctrl+z")),
+    (r"\bredo\b", lambda m, t: keyboard.press("ctrl+y")),
+    (r"\bsave (it|this|the file)?\b(?!.*\bnote\b)",
+     lambda m, t: keyboard.press("ctrl+s")),
+    (r"\bfind (on|in) (the )?page\b|\bfind in\b", lambda m, t: keyboard.press("ctrl+f")),
+    (r"\b(full ?screen|maximi[sz]e)\b", lambda m, t: keyboard.window_action("maximize")),
+    (r"\bminimi[sz]e\b", lambda m, t: keyboard.window_action("minimize")),
+    (r"\bpress ([a-z0-9+ ]+)$", lambda m, t: keyboard.press(
+        m.group(1).strip().replace(" plus ", "+").replace(" ", "+"))),
+    (r"\bwhat('s| is) (in front|focused|open right now)\b|\bwhich window\b",
+     lambda m, t: f"{keyboard.active_window() or 'Nothing'} is in front."),
 
     # ---- Machine control -------------------------------------------------
     (r"\b(screenshot|screen shot|screen capture|capture the screen|"
@@ -383,6 +433,13 @@ def _strip_fillers(text: str) -> str:
     text = re.sub(r"\b(the|a|an|my|that|this|it|i|i'?m|am|is|with|task|item)\b",
                   " ", text, flags=re.I)
     return re.sub(r"\s+", " ", text).strip(" .!?,")
+
+
+def _typed_text(text: str) -> str:
+    """'type hello world' -> 'hello world', quotes stripped if they used any."""
+    body = _after(text, r"\b(type|write|enter)\b\s*(out)?\s*(:)?")
+    body = re.sub(r"^(this|that|the following)\s*:?\s*", "", body, flags=re.I)
+    return body.strip().strip('"“”‘’\'')
 
 
 def _reminder_text(text: str) -> str:

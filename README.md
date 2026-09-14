@@ -46,6 +46,27 @@ Plain English, the way you would ask a person.
 | `focus mode` | closes WhatsApp, Discord, Steam and friends |
 | `next track` / `pause the music` | media keys |
 
+### Work inside the app that's open
+Opening a program is only half of it. Jarvis drives the real keyboard, so
+these go to whatever window is in front.
+
+| Say | What happens |
+|---|---|
+| `search for python tutorials` | new tab in your browser, typed and sent |
+| `type hello world` | types it into the focused window |
+| `switch to chrome` / `bring up notepad` | brings that window to the front |
+| `new tab` / `close the tab` / `next tab` | Ctrl+T, Ctrl+W, Ctrl+Tab |
+| `go back` / `refresh` / `scroll down` | browsing |
+| `select all` / `copy that` / `paste` / `undo` / `save it` | the usual keys |
+| `find on page` | Ctrl+F |
+| `press ctrl plus shift plus n` | any key or combo you name |
+| `what's in front` | tells you which window has focus |
+
+> Typing lands in whichever window is focused, so Jarvis names it back to
+> you: *Typed "hello" into agents.py - Notepad.* And if the **AI** guessed
+> that you wanted typing — rather than a rule matching plainly — it asks
+> first, naming the window before it touches anything.
+
 ### Files
 | Say | What happens |
 |---|---|
@@ -280,6 +301,7 @@ ai.py              The optional extra brain -- Ollama and Claude.
 
 skills/
   pc.py            Apps, volume, brightness, screenshots, lock, clipboard
+  keyboard.py      Typing, key combos, switching windows -- working inside apps
   files.py         Searching and tidying
   memory.py        Notes, to-dos, reminders, timers
   knowledge.py     Weather (Open-Meteo), Wikipedia, search, arithmetic
@@ -347,6 +369,12 @@ at all. A different network usually fixes it; otherwise use the type box.
 
 **It hears you but picks the wrong thing** — try the local AI (above); it makes
 a real difference. Or type the command instead.
+
+**In "Always listening" it hears me but does nothing** — that mode only acts on
+speech that starts with its name. Say *"Jarvis, open chrome"*, not *"open
+chrome"*. Anything without the name is shown faded, so you can see it heard you
+and chose to wait. For one-off commands, click the circle instead — then no
+name is needed.
 
 **"Port 8765 is already in use"** — Jarvis is already running. Close the old
 window, or change `PORT` in `jarvis.py`.
