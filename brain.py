@@ -383,6 +383,15 @@ RULES = [
      lambda m, t: pc.media("pause")),
     (r"\bplay\b.*\b(song|music|something)\b|\bplay some\b",
      lambda m, t: _play_music(t)),
+    # "resume it" used to reach the AI, which -- since macros arrived --
+    # decided it meant the "start work" macro.
+    #
+    # "resume" cannot be matched on its own, though: it is also a noun, and
+    # "find my resume" is the first thing you ever ask this. So it counts
+    # only as a bare word or with something playable after it.
+    (r"^resume$|\bresume (it|that|this|playback|the (music|song|track|video))\b|"
+     r"\b(unpause|un-pause|carry on|keep playing)\b|\bplay (it|that) again\b",
+     lambda m, t: pc.media("play")),
 
     # ---- How the machine is doing ----------------------------------------
     (r"\b(battery|charge|charging|power level)\b", lambda m, t: sysinfo.battery()),
@@ -423,6 +432,36 @@ RULES = [
      r"how does .* work|explain)\b",
      lambda m, t: knowledge.wiki(_topic(t))),
 
+    # ---- The same commands, in Hindi -------------------------------------
+    # These are measured, not guessed. router_score.py showed qwen2.5:7b
+    # reading "chrome band karo" as OPEN chrome -- and still doing it after
+    # the router prompt was told, in plain words, that band karo means
+    # close. "spotify band karo" is right. "band karo chrome" is right.
+    # "chrome ko band karo" is right. It is that one app in that one word
+    # order, and no amount of instruction shifted it.
+    #
+    # Which is the argument for rules in one example: a pattern has no
+    # prior to argue with. These never reach the model at all, and they
+    # answer instantly instead of in three seconds.
+    #
+    # They sit here, below every specific English rule and just above the
+    # broad open/close, so nothing above loses a sentence to them.
+    (r"\b(bandh?|bund)\s+(karo|kar do|kar den|kardo|kar)\b",
+     lambda m, t: pc.close_app(_app_name(t))),
+    (r"\b(kholo|khol do|kholdo|chaalu|chalu|shuru)\b",
+     lambda m, t: pc.open_app(_app_name(t))),
+    (r"\b(dhoondo|dhundo|dhundho|dhoondho|khojo|talash)\b",
+     lambda m, t: files.search(_app_name(t))),
+    (r"\bawaaz\b.*\b(badhao|badha|tez|zyada|zor)\b|\b(tez|zor se)\s+karo\b",
+     lambda m, t: pc.volume("up")),
+    (r"\bawaaz\b.*\b(kam|ghatao|dheere|halka)\b|\b(dheere|kam)\s+karo\b",
+     lambda m, t: pc.volume("down")),
+    (r"\b(gaana|gana|gaane|music|song)\b.*\bchala(o|do)\b|"
+     r"\bchala(o|do)\b.*\b(gaana|gana|gaane)\b",
+     lambda m, t: pc.media("play")),
+    (r"\blikh(o|do| do)\b",
+     lambda m, t: keyboard.type_text(_after(t, r"likh(?:o|do| do)"))),
+
     # ---- Opening and closing apps (last -- these are very broad) ---------
     (r"\b(close|quit|exit|kill|shut)\b",
      lambda m, t: pc.close_app(_app_name(t))),
@@ -454,6 +493,14 @@ def _first_number(text: str) -> int:
 
 _VERBS = (r"\b(open|launch|start|run|fire up|bring up|pull up|show me|show|"
           r"close|quit|exit|kill|shut(\s?down)?|"
+          # The same verbs in Hindi, so "chrome band karo" leaves "chrome"
+          # rather than "chrome band karo" -- which would be looked up as
+          # an app of that name and found nowhere. Longest first: "kar do"
+          # has to be tried before "kar", or it leaves a stray "do".
+          r"kholo|khol do|kholdo|chaalu|chalu|shuru|bandh|band|bund|"
+          r"karo|kardo|kar do|kar den|kar|"
+          r"dhoondho|dhoondo|dhundho|dhundo|khojo|talash|"
+          r"chalao|chalado|chala do|likho|likhdo|likh do|likh|mera|meri|"
           r"the|a|an|my|that|this|it|up|for me|app|application|program|"
           r"window|please|can you|could you|would you|i want to|i need to)\b")
 

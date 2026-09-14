@@ -170,6 +170,35 @@ pages open directly through Windows' own `ms-settings:` links, so
 | `play some lofi on youtube` | opens YouTube |
 | `how's the battery` / `how much space do I have` | machine health |
 
+### In Hindi
+
+The common commands work in Hindi too, as instant rules rather than through
+the AI:
+
+| Say | What happens |
+|---|---|
+| `chrome band karo` / `bandh kar do` | closes it |
+| `chrome kholo` / `notion chalu karo` | opens it |
+| `mera resume dhundo` / `dhoondo my thesis` | searches for the file |
+| `awaaz badhao` / `awaaz kam karo` | volume up / down |
+| `gaana chalao` | play/pause |
+| `likho hello world` | types it |
+
+These exist because they were **measured**, not guessed. `router_score.py`
+scores how often the local model picks the right action, and it showed
+qwen2.5:7b reading `chrome band karo` as *open* Chrome — and still doing it
+after the prompt was told in plain words that *band karo* means close:
+
+```
+'chrome band karo'     -> open_app    ✗     'band karo chrome'    -> close_app  ✓
+'chrome bandh karo'    -> open_app    ✗     'chrome ko band karo' -> close_app  ✓
+'spotify band karo'    -> close_app   ✓
+```
+
+One app, one word order, an association too strong to instruct away. Which is
+the case for rules in a nutshell: **a pattern has no prior to argue with.** It
+also answers instantly instead of in three seconds.
+
 ### Macros — one name, several commands
 
 Opening VS Code, Chrome and Spotify every morning is three sentences. A macro
@@ -411,6 +440,8 @@ jarvis.py          The server. Serves the page, passes commands along.
 brain.py           THE BRAIN. "what was said" -> "what to do". The rules live here.
 persona.py         Who it sounds like. Jarvis and Ultron, plus the voice settings.
 ai.py              The optional extra brain -- Ollama and Claude.
+test_jarvis.py     The checks. Run it after changing anything.
+router_score.py    Scores how often the local model picks the right action.
 
 skills/
   pc.py            Apps, volume, brightness, screenshots, lock, clipboard

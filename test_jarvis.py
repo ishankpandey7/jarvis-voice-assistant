@@ -17,6 +17,7 @@ Three parts, and the split matters:
 Nothing here opens an app, presses a key, moves a file or touches your own
 data/ folder. That is deliberate -- a test run should cost you nothing.
 """
+import inspect
 import json
 import re
 import sys
@@ -59,6 +60,23 @@ def section(title):
 
 
 # ---------------------------------------------------------------- ROUTING
+
+def rule_source(index):
+    """
+    Which skill a rule calls, read off the lambda itself.
+
+    Stronger than checking the pattern text: a pattern only tells you what
+    the rule listens for, and this tells you what it actually does. It is
+    what catches a rule that matches the right sentence and then runs the
+    wrong skill.
+    """
+    if not isinstance(index, int):
+        return ""
+    try:
+        return inspect.getsource(brain.RULES[index][1])
+    except (OSError, TypeError):                   # built without source
+        return ""
+
 
 def which_rule(text):
     """The index of the rule that would run, without running it."""
@@ -121,6 +139,43 @@ for phrase, expected in ROUTES:
     pattern = brain.RULES[index][0]
     check(f"{phrase!r} -> rule {index}", re.search(expected, pattern, re.I) is not None,
           f"rule {index} is {pattern[:70]!r}, expected something matching {expected!r}")
+
+section("ROUTING -- Hindi reaches the same skills, without the AI")
+# Measured into existence: router_score.py showed qwen reading "chrome band
+# karo" as OPEN chrome and not letting go of it. These make the model
+# irrelevant for the common ones -- and instant, which is the bigger win.
+for phrase, skill, target in [
+    ("chrome band karo", "pc.close_app", "chrome"),
+    ("chrome bandh karo", "pc.close_app", "chrome"),
+    ("telegram band kar do", "pc.close_app", "telegram"),
+    ("spotify band karo", "pc.close_app", "spotify"),
+    ("chrome kholo", "pc.open_app", "chrome"),
+    ("notion chalu karo", "pc.open_app", "notion"),
+    ("mera resume dhundo", "files.search", "resume"),
+    ("dhoondo my thesis", "files.search", "thesis"),
+    ("awaaz badhao", 'pc.volume("up")', ""),
+    ("awaaz kam karo", 'pc.volume("down")', ""),
+    ("gaana chalao", 'pc.media("play")', ""),
+    ("likho hello world", "keyboard.type_text", "hello world"),
+]:
+    index = which_rule(phrase)
+    ok = skill in rule_source(index)
+    check(f"{phrase!r} -> {skill}", ok, f"rule {index}: {rule_source(index)[:70]!r}")
+    if ok and target:
+        got = brain._app_name(brain.clean(phrase))
+        check(f"   target is {target!r}, not the Hindi verb", got == target,
+              f"got {got!r}")
+
+# "resume" is a noun as well as a command, and "find my resume" is the
+# first thing anyone asks this. The media rule must not take it.
+for phrase, want_media in [("resume it", True), ("resume", True),
+                           ("resume the music", True), ("carry on", True),
+                           ("find my resume", False), ("where is my resume", False),
+                           ("mera resume dhundo", False)]:
+    index = which_rule(phrase)
+    is_media = 'pc.media("play")' in rule_source(index)
+    check(f"{phrase!r} -> {'media keys' if want_media else 'not the media keys'}",
+          is_media == want_media, f"rule {index}: {rule_source(index)[:70]!r}")
 
 section("ROUTING -- macro commands do not collide with ordinary ones")
 for phrase, expect_macro_rule in [

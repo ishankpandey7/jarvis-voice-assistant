@@ -122,7 +122,44 @@ Output ONLY the action and its target. Never answer the question yourself.
   answer       a general question or chit-chat needing no action. target = ""
 
 Pick "answer" only when no action above fits. Never guess a target you were
-not given -- leave it empty instead."""
+not given -- leave it empty instead.
+
+The three things that go wrong most, so decide these deliberately:
+
+1. A question ABOUT this laptop is an action, not conversation. Asking how
+   much battery is left is "battery", not "answer" -- you cannot know the
+   number, the action can. Same for disk, open apps, and finding a file.
+   Keep "answer" for things no action can do: opinions, chit-chat, facts
+   about the world.
+
+2. Hindi and Hinglish mean the same actions as English. Common ones:
+     kholo, chalu karo        -> open_app
+     band karo, bandh karo    -> close_app
+     dhoondo, khojo, dekho    -> search_file
+     awaaz badhao, tez karo   -> volume_up
+     awaaz kam karo, dheere   -> volume_down
+     chalao                   -> play_pause
+     likho                    -> type_text
+   Never put the Hindi word in the target. "spotify bandh karo" has the
+   target "spotify", not "bandh karo".
+
+3. run_macro ONLY when the words name a macro from the list below almost
+   exactly. A vague phrase is never a macro. If you are reaching, it is
+   not run_macro.
+
+Examples:
+  "pull up notion"               -> open_app, "notion"
+  "spotify bandh karo"           -> close_app, "spotify"
+  "how much battery do i have"   -> battery, ""
+  "is my disk full"              -> disk, ""
+  "find my tax documents"        -> search_file, "tax documents"
+  "mera invoice khojo"           -> search_file, "invoice"
+  "locking up, back later"       -> lock, ""
+  "crank the volume"             -> volume_up, ""
+  "play it again"                -> play_pause, ""
+  "stick on some jazz"           -> youtube, "jazz"
+  "who invented the telephone"   -> wikipedia, "telephone"
+  "do you ever get bored"        -> answer, \"\""""
 
 
 def _router_prompt() -> str:
@@ -243,18 +280,31 @@ def _ollama_chat(system: str, user: str, schema=None, timeout: int = 60):
         return None
 
 
-def _ask_local(text: str):
+def route(text: str):
+    """
+    Ask the model which action fits, and stop there. ("action", "target")
+
+    Split out from _ask_local on purpose: it is the only part worth
+    measuring, and measuring it must not DO anything. test_router.py asks
+    for a hundred routings in a row, and not one of them opens an app.
+
+    Returns (None, "") when Ollama is unreachable or answers with something
+    that is not JSON -- the caller treats that as "no opinion".
+    """
     raw = _ollama_chat(_router_prompt(), text, schema=ROUTER_SCHEMA)
     if raw is None:
-        return None
-
+        return None, ""
     try:
         plan = json.loads(raw)
     except json.JSONDecodeError:
-        return None
+        return None, ""
+    return plan.get("action", "answer"), (plan.get("target") or "").strip()
 
-    action = plan.get("action", "answer")
-    target = (plan.get("target") or "").strip()
+
+def _ask_local(text: str):
+    action, target = route(text)
+    if action is None:
+        return None
 
     if action in ACTIONS:
         return _run(action, target, "local")
