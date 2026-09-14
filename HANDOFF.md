@@ -110,6 +110,14 @@ already open appends to it. Escape first, then Ctrl+A before typing.
 imported once at startup. Files under `web/` are read fresh each request, so
 those only need a browser reload.
 
+**Two servers can hold port 8765 at once, and the OLDER one answers.**
+Windows allows the second bind instead of refusing it, so starting a second
+Jarvis looks like it worked and every request still goes to the stale one.
+The symptom is alarming and misleading: the rules all seem to have vanished
+and the AI answers everything. Check with `netstat -ano | findstr 8765` —
+two LISTENING lines means this. `python test_jarvis.py 8766` runs the checks
+against a different port so it never fights a server you already have up.
+
 ---
 
 ## The long microphone saga — the answer, so nobody repeats it
@@ -151,7 +159,11 @@ the wrong thing. No way to check without seeing the screen.
 **Compound commands do not work.** "Open chrome and search for X" is one
 sentence; the rules match one thing each. It usually only does the first half.
 
-**No macros.** No way to say one word and have five things happen.
+~~**No macros.**~~ Done — `skills/macros.py`. Say `start work` and it opens
+VS Code, Chrome and Spotify. Steps are just things you would say, so a macro
+can do anything Jarvis can. `create a macro called X: a, then b` saves one by
+voice; `data/macros.json` holds them. It will not answer a confirmation for
+you (it skips that step and says so) and it will not run itself.
 
 **The Claude API path is untested** — written to the current API, never run,
 because I have no key.
@@ -164,8 +176,19 @@ typing or over HTTP.
 
 ## How to test
 
-There is no test framework. What I have been doing, and it works well: start
-the server, then POST to `/api/command` with assertions.
+**`python test_jarvis.py`** — the checks now live in the repo instead of
+being retyped each time. **88 pass.** Three parts:
+
+- **routing** — which rule catches a sentence, without executing it, so it
+  can safely cover `lock the laptop` and `close chrome`
+- **macros** — the engine end to end, on a throwaway file
+- **live** — real answers over HTTP, read-only commands only
+
+It opens no apps, presses no keys and never touches `data/`. If the server
+is not running it skips the live part rather than failing. Add to it.
+
+The pattern underneath, if you want a one-off: start the server, then POST
+to `/api/command` with assertions.
 
 ```python
 import json, sys, urllib.request
@@ -181,9 +204,8 @@ def ask(t):
 CHECKS = [("battery", "how's the battery", lambda d: "percent" in d["speak"])]
 ```
 
-**33 of these pass right now.** Please keep them passing, and add to them.
-
-To check routing without side effects (some commands really press keys):
+To check routing by hand, without side effects (some commands really press
+keys):
 
 ```python
 import re, brain
@@ -200,16 +222,18 @@ Set `ai.BACKEND = "off"` to test the rules alone.
 
 Roughly in the order I care about:
 
-1. **Macros** — "start work" opens VS Code, Chrome and Spotify together.
-   Should be data-driven like `recipes.json`, so I can add my own.
-2. **Compound commands** — "open chrome and search for X" in one sentence.
-3. **More apps and shortcuts** — keep growing `recipes.py` and `desktop.py`.
-4. **Offline speech-to-text** — would drop Chrome and Google entirely, work in
+1. **Compound commands** — "open chrome and search for X" in one sentence.
+   Most of the machinery is already there: `macros.run()` executes a list of
+   spoken commands one after another, so this is mostly the splitting, which
+   is the risky half — "remind me to call mum and dad" must not become two
+   steps. `macros._BETWEEN` is the splitter to start from.
+2. **More apps and shortcuts** — keep growing `recipes.py` and `desktop.py`.
+3. **Offline speech-to-text** — would drop Chrome and Google entirely, work in
    any browser, let the microphone be chosen in code (the Web Speech API never
    allows that), and keep my voice on the machine. `faster-whisper` is the
    route and **`ctranslate2` does have a `cp314` wheel — I checked.** An
    earlier attempt is in the git history; it was removed as dead code.
-5. **Screen awareness** — the real unlock, and much harder.
+4. **Screen awareness** — the real unlock, and much harder.
 
 ---
 
